@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Anotar.Log4Net;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -8,21 +10,21 @@ using System.Threading.Tasks;
 
 namespace SharpReplay
 {
-    public class FragmentParser
+    [DebuggerDisplay("{Name}: {Data.Length} bytes")]
+    public readonly struct Mp4Box
     {
-        [DebuggerDisplay("{Name}: {Data.Length} bytes")]
-        public readonly struct Box
+        public string Name { get; }
+        public byte[] Data { get; }
+
+        public Mp4Box(string name, in byte[] data)
         {
-            public string Name { get; }
-            public byte[] Data { get; }
-
-            public Box(string name, in byte[] data)
-            {
-                this.Name = name;
-                this.Data = data;
-            }
+            this.Name = name;
+            this.Data = data;
         }
+    }
 
+    public class FragmentParser : IEnumerable<Mp4Box>
+    {
         private readonly Stream BaseStream;
 
         public FragmentParser(Stream stream)
@@ -30,12 +32,11 @@ namespace SharpReplay
             this.BaseStream = stream;
         }
 
-        public IEnumerable<Box> GetBoxes()
+        public IEnumerable<Mp4Box> GetBoxes()
         {
             byte[] lengthB = new byte[4];
             byte[] nameB = new byte[4];
             byte[] data;
-            var asd = new List<byte>();
 
             while (true)
             {
@@ -48,10 +49,25 @@ namespace SharpReplay
                 BaseStream.Read(nameB, 0, 4);
                 string name = Encoding.UTF8.GetString(nameB, 0, 4);
 
-                BaseStream.ReadCompletely(data, length);
+                Buffer.BlockCopy(lengthB, 0, data, 0, 4);
+                Buffer.BlockCopy(nameB, 0, data, 4, 4);
 
-                yield return new Box(name, data);
+                try
+                {
+                    BaseStream.ReadCompletely(data, 8, length - 8);
+                }
+                catch (Exception ex)
+                {
+                    LogTo.FatalException("Recording error", ex);
+                    yield break;
+                }
+
+                yield return new Mp4Box(name, data);
             }
         }
+
+        public IEnumerator<Mp4Box> GetEnumerator() => GetBoxes().GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

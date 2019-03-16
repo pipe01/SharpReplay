@@ -1,12 +1,9 @@
 ﻿using Anotar.Log4Net;
-using Nito.AsyncEx;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,28 +14,26 @@ namespace SharpReplay
         private readonly struct Fragment
         {
             public DateTimeOffset Time { get; }
-            public byte[] Data { get; }
+            public Mp4Box[] Boxes { get; }
 
-            public Fragment(DateTimeOffset time, byte[] data)
+            public Fragment(DateTimeOffset time, Mp4Box[] boxes)
             {
                 this.Time = time;
-                this.Data = data;
+                this.Boxes = boxes;
             }
         }
 
         public bool IsRecording { get; private set; }
 
-        public int MaxReplayLengthSeconds { get; set; } = 30;
+        public int MaxReplayLengthSeconds { get; set; } = 5;
         public int Framerate { get; set; } = 30;
-        public bool RecordSystemAudio { get; set; } = false;
+        public bool RecordSystemAudio { get; set; } = true;
 
         private Process FFmpeg;
         private NamedPipeServerStream OutputPipe;
-        private AsyncAutoResetEvent FragmentEvent = new AsyncAutoResetEvent();
 
         private ContinuousList<Fragment> Fragments;
-        private MemoryStream CurrentFragment = new MemoryStream();
-        private byte[] Mp4Header = null;
+        private byte[] Mp4Header;
 
         public async Task StartAsync()
         {
@@ -50,58 +45,67 @@ namespace SharpReplay
 
             LogTo.Info("Start recording");
 
-            Fragments = new ContinuousList<Fragment>(5);
+            Fragments = new ContinuousList<Fragment>(200);
+            Mp4Header = null;
 
             await StartPipeAndProcess();
 
-            new Thread(FragmentsThread)
+            var thread = new Thread(FragmentsThread)
             {
-                IsBackground = true
-            }.Start();
+                IsBackground = true,
+                Name = "RecorderThread"
+            };
+
+            thread.Start();
+
+            LogTo.Debug("Thread started with ID {0}", thread.ManagedThreadId);
 
             IsRecording = true;
         }
 
-        public async Task WriteReplayAsync(Stream toStream)
+        public async Task WriteReplayAsync(Stream toStream, bool closeStream = true)
         {
             if (!IsRecording)
                 throw new InvalidOperationException("Not recording");
 
             LogTo.Info("Writing replay");
 
-            await FragmentEvent.WaitAsync();
-
             toStream.Write(Mp4Header, 0, Mp4Header.Length);
 
+            await StopAsync();
+
             int count = 0;
-            foreach (var item in Fragments.Where(o => (DateTimeOffset.Now - o.Time).TotalSeconds < MaxReplayLengthSeconds))
+            foreach (var item in Fragments.Where(o => (DateTimeOffset.Now - o.Time).TotalSeconds <= MaxReplayLengthSeconds))
             {
-                File.WriteAllBytes($"frag{count}.bin", item.Data);
-                toStream.Write(item.Data, 0, item.Data.Length);
+                foreach (var box in item.Boxes)
+                {
+                    toStream.Write(box.Data, 0, box.Data.Length);
+                }
 
                 count++;
             }
 
+            if (closeStream)
+                toStream.Dispose();
+
             LogTo.Info("Written {0} fragments", count);
+
+            await StartAsync();
         }
 
-        public async Task StopAsync(bool waitForFragment = true)
+        public async Task StopAsync()
         {
-            if (waitForFragment)
-                await FragmentEvent.WaitAsync();
+            LogTo.Info("Stopping");
+
+            FFmpeg.StandardInput.Write("qqqqqqqqqqqqqqqq");
+            await FFmpeg.WaitForExitAsync();
 
             IsRecording = false;
 
             FFmpeg.Close();
             FFmpeg.Dispose();
             OutputPipe.Dispose();
-
-            Fragments.Clear();
-            CurrentFragment.Dispose();
-            CurrentFragment = new MemoryStream();
-
-            Mp4Header = null;
-
+            
             GC.Collect();
         }
 
@@ -118,7 +122,7 @@ namespace SharpReplay
                 Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + (RecordSystemAudio ?
                             @"-f dshow -i audio=""@device_cm_{33D9A762-90C8-11D0-BD43-00A0C911CE86}\wave_{5F5B258C-644B-4ACA-B5DA-26733B50300E}"" " : "") +
                              "-g 27 -strict experimental -crf 0 -preset ultrafast -b:v 4M -c:v h264_amf " +
-                           $@"-r {Framerate} -f mp4 -movflags frag_keyframe+empty_moov -y \\.\pipe\ffpipe",
+                           $@"-r {Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                 RedirectStandardInput = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
@@ -135,36 +139,28 @@ namespace SharpReplay
             await OutputPipe.WaitForConnectionAsync();
         }
 
-        private Stream OutFile;
         private void FragmentsThread()
         {
-            OutFile = File.OpenWrite("out.flv");
             byte[] buffer = new byte[OutputPipe.InBufferSize];
 
-            while (OutputPipe.IsConnected)
+            var boxes = new FragmentParser(OutputPipe);
+
+            var headerBoxes = boxes.Take(2).ToArray();
+            Mp4Header = headerBoxes.SelectMany(o => o.Data).ToArray();
+
+            Mp4Box lastMoof = default;
+
+            foreach (var item in boxes)
             {
-                var read = OutputPipe.Read(buffer, 0, buffer.Length);
+                LogTo.Debug("Box: " + item.Name);
 
-                if (read > 0)
+                if (item.Name == "moof")
                 {
-                    OutFile.Write(buffer, 0, read);
-                    //string box = Encoding.UTF8.GetString(buffer, 4, 4);
-                    //LogTo.Debug(box);
-
-                    //if (box == "moof")
-                    //{
-                    //    if (Mp4Header == null)
-                    //        Mp4Header = CurrentFragment.ToArray();
-                    //    else
-                    //        Fragments.Add(new Fragment(DateTimeOffset.Now, CurrentFragment.ToArray()));
-
-                    //    LogTo.Debug("Fragment length: " + CurrentFragment.Length);
-                        
-                    //    CurrentFragment.Position = 0;
-                    //    FragmentEvent.Set();
-                    //}
-
-                    //CurrentFragment.Write(buffer, 0, read);
+                    lastMoof = item;
+                }
+                else
+                {
+                    Fragments.Add(new Fragment(DateTimeOffset.Now, new[] { lastMoof, item }));
                 }
             }
         }

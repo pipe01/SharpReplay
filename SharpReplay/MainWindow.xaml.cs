@@ -26,8 +26,6 @@ namespace SharpReplay
 
         private async void Button_Click(object sender, RoutedEventArgs e)
         {
-            Console.WriteLine("Begin");
-
             await Recorder.StartAsync();
         }
         
@@ -40,11 +38,8 @@ namespace SharpReplay
         {
             if (File.Exists("out.mp4"))
                 File.Delete("out.mp4");
-
-            using (var file = File.OpenWrite("out.mp4"))
-            {
-                await Recorder.WriteReplayAsync(file);
-            }
+            
+            await Recorder.WriteReplayAsync(File.OpenWrite("out.mp4"));
         }
     }
 }
