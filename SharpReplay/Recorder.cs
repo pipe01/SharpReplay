@@ -71,13 +71,15 @@ namespace SharpReplay
             LogTo.Info("Writing replay to \"{0}\"", outPath);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outPath));
-            
+
+            var pipe = new NamedPipeServerStream("outpipe", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 448 * 1024);
+
             var curator = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $"-i - -c:v {VideoCodec} -b:a 128k {outPath}",
+                    Arguments = $@"-i \\.\pipe\outpipe -c:v {VideoCodec} -b:a 128k {outPath}",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     CreateNoWindow = true
@@ -85,8 +87,13 @@ namespace SharpReplay
             };
             curator.Start();
 
-            await WriteReplayAsync(curator.StandardInput.BaseStream, false);
+            await pipe.WaitForConnectionAsync();
+            await WriteReplayAsync(pipe, false);
+
+            curator.StandardInput.Write("qqqqqqqqqqqqqqq");
             await curator.WaitForExitAsync();
+
+            pipe.Dispose();
 
             LogTo.Info("Done writing");
         }
@@ -118,7 +125,7 @@ namespace SharpReplay
 
             LogTo.Info("Written {0} fragments", count);
 
-            await StartAsync();
+            //await StartAsync();
         }
 
         public async Task StopAsync()

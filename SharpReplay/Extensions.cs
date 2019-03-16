@@ -11,19 +11,12 @@ namespace SharpReplay
         {
             int remaining = count;
 
-            while (true)
+            while (remaining > 0)
             {
                 int read = stream.Read(buffer, offset, remaining);
-
-                if (read < count)
-                {
-                    offset += read;
-                    remaining -= read;
-                }
-                else
-                {
-                    break;
-                }
+                
+                offset += read;
+                remaining -= read;
             }
         }
 
