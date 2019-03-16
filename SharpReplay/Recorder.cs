@@ -1,5 +1,7 @@
 ﻿using Anotar.Log4Net;
+using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -13,10 +15,10 @@ namespace SharpReplay
     {
         private readonly struct Fragment
         {
-            public DateTimeOffset Time { get; }
+            public TimeSpan Time { get; }
             public Mp4Box[] Boxes { get; }
 
-            public Fragment(DateTimeOffset time, Mp4Box[] boxes)
+            public Fragment(TimeSpan time, Mp4Box[] boxes)
             {
                 this.Time = time;
                 this.Boxes = boxes;
@@ -32,9 +34,12 @@ namespace SharpReplay
 
         private Process FFmpeg;
         private NamedPipeServerStream OutputPipe;
+        private Stopwatch Timer = new Stopwatch();
 
+        private AsyncAutoResetEvent FragmentEvent = new AsyncAutoResetEvent();
         private ContinuousList<Fragment> Fragments;
         private byte[] Mp4Header;
+        private List<Mp4Box> Footer;
 
         public async Task StartAsync()
         {
@@ -47,6 +52,7 @@ namespace SharpReplay
             LogTo.Info("Start recording");
 
             Fragments = new ContinuousList<Fragment>(200);
+            Footer = new List<Mp4Box>();
             Mp4Header = null;
 
             await StartPipeAndProcess();
@@ -66,11 +72,17 @@ namespace SharpReplay
 
         public async Task WriteReplayAsync()
         {
+            LogTo.Debug("Current time: {0}", DateTimeOffset.Now.ToUnixTimeMilliseconds());
+            LogTo.Debug("Last fragment time: {0}", Fragments.Last.Time.TotalMilliseconds);
+
             string outPath = $"./out/{DateTime.Now:yyyyMMdd_hhmmss}.mp4";
 
             LogTo.Info("Writing replay to \"{0}\"", outPath);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outPath));
+
+            await WriteReplayAsync(File.OpenWrite(outPath), true);
+            return;
 
             var pipe = new NamedPipeServerStream("outpipe", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 448 * 1024);
 
@@ -96,6 +108,7 @@ namespace SharpReplay
             pipe.Dispose();
 
             LogTo.Info("Done writing");
+            await StartAsync();
         }
 
         public async Task WriteReplayAsync(Stream toStream, bool closeStream = true)
@@ -103,14 +116,21 @@ namespace SharpReplay
             if (!IsRecording)
                 throw new InvalidOperationException("Not recording");
 
+            Timer.Stop();
+
             LogTo.Info("Writing replay");
+
+            LogTo.Debug("Waiting for one more fragment");
+            await FragmentEvent.WaitAsync();
 
             toStream.Write(Mp4Header, 0, Mp4Header.Length);
 
             await StopAsync();
 
+            var frags = Fragments.Reverse().Where(o => (Timer.Elapsed - o.Time).TotalSeconds <= MaxReplayLengthSeconds).Reverse().ToArray();
+            var a = DateTimeOffset.Now;
             int count = 0;
-            foreach (var item in Fragments.Where(o => (DateTimeOffset.Now - o.Time).TotalSeconds <= MaxReplayLengthSeconds))
+            foreach (var item in frags)
             {
                 foreach (var box in item.Boxes)
                 {
@@ -120,12 +140,13 @@ namespace SharpReplay
                 count++;
             }
 
+            byte[] footer = Footer.SelectMany(o => o.Data).ToArray();
+            toStream.Write(footer, 0, footer.Length);
+
             if (closeStream)
                 toStream.Dispose();
 
             LogTo.Info("Written {0} fragments", count);
-
-            //await StartAsync();
         }
 
         public async Task StopAsync()
@@ -135,6 +156,7 @@ namespace SharpReplay
             FFmpeg.StandardInput.Write("qqqqqqqqqqqqqqqq");
             await FFmpeg.WaitForExitAsync();
 
+            Timer.Stop();
             IsRecording = false;
 
             FFmpeg.Close();
@@ -156,7 +178,7 @@ namespace SharpReplay
                 FileName = "ffmpeg.exe",
                 Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + (RecordSystemAudio ?
                             @"-f dshow -i audio=""@device_cm_{33D9A762-90C8-11D0-BD43-00A0C911CE86}\wave_{5F5B258C-644B-4ACA-B5DA-26733B50300E}"" -b:a 128k " : "") +
-                            $"-g 27 -strict experimental -crf 0 -preset ultrafast -b:v 4M -c:v {VideoCodec} " +
+                            $"-g 10 -strict experimental -crf 0 -preset ultrafast -b:v 5M -c:v {VideoCodec} " +
                            $@"-r {Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                 RedirectStandardInput = true,
                 UseShellExecute = false,
@@ -178,6 +200,8 @@ namespace SharpReplay
         {
             byte[] buffer = new byte[OutputPipe.InBufferSize];
 
+            Timer.Restart();
+
             var boxes = new FragmentParser(OutputPipe);
 
             var headerBoxes = boxes.Take(2).ToArray();
@@ -185,17 +209,22 @@ namespace SharpReplay
 
             Mp4Box lastMoof = default;
 
-            foreach (var item in boxes)
+            foreach (var box in boxes)
             {
-                LogTo.Debug("Box: " + item.Name);
+                LogTo.Debug("Box: " + box.Name);
 
-                if (item.Name == "moof")
+                if (box.Name == "moof")
                 {
-                    lastMoof = item;
+                    lastMoof = box;
+                }
+                else if (box.Name == "mdat")
+                {
+                    Fragments.Add(new Fragment(Timer.Elapsed, new[] { lastMoof, box }));
+                    FragmentEvent.Set();
                 }
                 else
                 {
-                    Fragments.Add(new Fragment(DateTimeOffset.Now, new[] { lastMoof, item }));
+                    Footer.Add(box);
                 }
             }
         }

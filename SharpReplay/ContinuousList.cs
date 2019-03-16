@@ -49,7 +49,10 @@ namespace SharpReplay
 
         public IEnumerator<T> GetEnumerator()
         {
-            return Items.Skip(Index).Take(HasLooped ? Capacity : Capacity - Index).Concat(Items.Take(Index)).GetEnumerator();
+            if (HasLooped)
+                return Items.Skip(Index).Take(Capacity).Concat(Items.Take(Index)).GetEnumerator();
+            else
+                return Items.Take(Index).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
