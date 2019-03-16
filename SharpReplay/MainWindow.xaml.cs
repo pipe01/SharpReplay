@@ -26,6 +26,9 @@ namespace SharpReplay
 
         private async void Button_Click(object sender, RoutedEventArgs e)
         {
+            Recorder.RecordAudio = true;
+            Recorder.AudioDevice = (string)Audio.SelectedValue;
+
             await Recorder.StartAsync();
         }
         
@@ -37,6 +40,12 @@ namespace SharpReplay
         private async void Save_Click(object sender, RoutedEventArgs e)
         {
             await Recorder.WriteReplayAsync();
+        }
+
+        private async void Window_Initialized(object sender, EventArgs e)
+        {
+            Audio.ItemsSource = await Utils.GetAudioDevices();
+            Audio.SelectedIndex = 0;
         }
     }
 }

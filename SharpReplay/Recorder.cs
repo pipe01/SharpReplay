@@ -33,7 +33,8 @@ namespace SharpReplay
 
         public int MaxReplayLengthSeconds { get; set; } = 5;
         public int Framerate { get; set; } = 30;
-        public bool RecordSystemAudio { get; set; } = true;
+        public bool RecordAudio { get; set; }
+        public string AudioDevice { get; set; }
         public string VideoCodec { get; set; } = "h264_amf";
 
         private Process FFmpeg;
@@ -85,8 +86,8 @@ namespace SharpReplay
             FFmpeg.StartInfo = new ProcessStartInfo
             {
                 FileName = "ffmpeg.exe",
-                Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + (RecordSystemAudio ?
-                            @"-f dshow -i audio=""@device_cm_{33D9A762-90C8-11D0-BD43-00A0C911CE86}\wave_{5F5B258C-644B-4ACA-B5DA-26733B50300E}"" -b:a 128k " : "") +
+                Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + (RecordAudio ?
+                           $@"-f dshow -i audio=""{AudioDevice}"" -b:a 128k " : "") +
                             $"-g 10 -strict experimental -crf 0 -preset ultrafast -b:v 5M -c:v {VideoCodec} " +
                            $@"-r {Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                 RedirectStandardInput = true,

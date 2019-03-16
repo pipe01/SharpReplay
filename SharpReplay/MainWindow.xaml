@@ -4,11 +4,13 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SharpReplay"
-        mc:Ignorable="d"
+        mc:Ignorable="d" Initialized="Window_Initialized"
         Title="MainWindow" Height="450" Width="800">
-    <StackPanel>
+    <StackPanel VerticalAlignment="Center">
         <Button Width="90" Height="40" Click="Button_Click">Begin recording</Button>
         <Button Width="90" Height="40" Click="Save_Click">Save replay</Button>
         <Button Width="90" Height="40" Click="Stop_Click">Stop recording</Button>
+
+        <ComboBox x:Name="Audio" Width="200" Margin="0 10 0 0" DisplayMemberPath="Item1" SelectedValuePath="Item2"></ComboBox>
     </StackPanel>
 </Window>
