@@ -8,6 +8,7 @@
         Title="MainWindow" Height="450" Width="800">
     <StackPanel>
         <Button Width="90" Height="40" Click="Button_Click">Begin recording</Button>
+        <Button Width="90" Height="40" Click="Save_Click">Save replay</Button>
         <Button Width="90" Height="40" Click="Stop_Click">Stop recording</Button>
     </StackPanel>
 </Window>
