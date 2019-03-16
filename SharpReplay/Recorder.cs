@@ -75,6 +75,64 @@ namespace SharpReplay
             IsRecording = true;
         }
 
+        private async Task StartPipeAndProcess()
+        {
+            LogTo.Debug("Creating pipe");
+
+            OutputPipe = new NamedPipeServerStream("ffpipe", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 448 * 1024, 0);
+
+            FFmpeg = new Process();
+            FFmpeg.StartInfo = new ProcessStartInfo
+            {
+                FileName = "ffmpeg.exe",
+                Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + (RecordSystemAudio ?
+                            @"-f dshow -i audio=""@device_cm_{33D9A762-90C8-11D0-BD43-00A0C911CE86}\wave_{5F5B258C-644B-4ACA-B5DA-26733B50300E}"" -b:a 128k " : "") +
+                            $"-g 10 -strict experimental -crf 0 -preset ultrafast -b:v 5M -c:v {VideoCodec} " +
+                           $@"-r {Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
+                RedirectStandardInput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            LogTo.Debug("Launching FFmpeg with arguments:");
+            LogTo.Debug(FFmpeg.StartInfo.Arguments);
+
+            FFmpeg.Start();
+            FFmpeg.PriorityClass = ProcessPriorityClass.High;
+
+            LogTo.Debug("Waiting for FFmpeg to connect to pipe");
+
+            new Thread(() =>
+            {
+                while (!FFmpeg.HasExited)
+                {
+                    var line = FFmpeg.StandardError.ReadLine();
+
+                    if (line == null)
+                        continue;
+
+                    LogTo.Debug($"[FFMPEG] {line}");
+
+                    if (line.StartsWith("  dts="))
+                    {
+                        string timeStr = FrameTimeRegex.Match(line).Value;
+                        long time = (long)(double.Parse(timeStr, CultureInfo.InvariantCulture) * 1000);
+
+                        LastReportedTime = DateTimeOffset.FromUnixTimeMilliseconds(time);
+                        KeyframeEvent.Set();
+                    }
+                }
+            })
+            {
+                IsBackground = true
+            }.Start();
+
+            await OutputPipe.WaitForConnectionAsync();
+
+            FFmpeg.StandardInput.Write("-h");
+        }
+
         public async Task WriteReplayAsync()
         {
             LogTo.Debug("Current time: {0}", DateTimeOffset.Now.ToUnixTimeMilliseconds());
@@ -165,64 +223,6 @@ namespace SharpReplay
             OutputPipe.Dispose();
             
             GC.Collect();
-        }
-
-        private async Task StartPipeAndProcess()
-        {
-            LogTo.Debug("Creating pipe");
-
-            OutputPipe = new NamedPipeServerStream("ffpipe", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 448 * 1024, 0);
-            
-            FFmpeg = new Process();
-            FFmpeg.StartInfo = new ProcessStartInfo
-            {
-                FileName = "ffmpeg.exe",
-                Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + (RecordSystemAudio ?
-                            @"-f dshow -i audio=""@device_cm_{33D9A762-90C8-11D0-BD43-00A0C911CE86}\wave_{5F5B258C-644B-4ACA-B5DA-26733B50300E}"" -b:a 128k " : "") +
-                            $"-g 10 -strict experimental -crf 0 -preset ultrafast -b:v 5M -c:v {VideoCodec} " +
-                           $@"-r {Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
-                RedirectStandardInput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            LogTo.Debug("Launching FFmpeg with arguments:");
-            LogTo.Debug(FFmpeg.StartInfo.Arguments);
-
-            FFmpeg.Start();
-            FFmpeg.PriorityClass = ProcessPriorityClass.High;
-
-            LogTo.Debug("Waiting for FFmpeg to connect to pipe");
-
-            new Thread(() =>
-            {
-                while (!FFmpeg.HasExited)
-                {
-                    var line = FFmpeg.StandardError.ReadLine();
-
-                    if (line == null)
-                        continue;
-
-                    LogTo.Debug($"[FFMPEG] {line}");
-
-                    if (line.StartsWith("  dts="))
-                    {
-                        string timeStr = FrameTimeRegex.Match(line).Value;
-                        long time = (long)(double.Parse(timeStr, CultureInfo.InvariantCulture) * 1000);
-
-                        LastReportedTime = DateTimeOffset.FromUnixTimeMilliseconds(time);
-                        KeyframeEvent.Set();
-                    }
-                }
-            })
-            {
-                IsBackground = true
-            }.Start();
-
-            await OutputPipe.WaitForConnectionAsync();
-
-            FFmpeg.StandardInput.Write("-h");
         }
 
         private void FragmentsThread()
