@@ -36,10 +36,7 @@ namespace SharpReplay
 
         private async void Save_Click(object sender, RoutedEventArgs e)
         {
-            if (File.Exists("out.mp4"))
-                File.Delete("out.mp4");
-            
-            await Recorder.WriteReplayAsync(File.OpenWrite("out.mp4"));
+            await Recorder.WriteReplayAsync();
         }
     }
 }

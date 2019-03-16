@@ -28,6 +28,7 @@ namespace SharpReplay
         public int MaxReplayLengthSeconds { get; set; } = 5;
         public int Framerate { get; set; } = 30;
         public bool RecordSystemAudio { get; set; } = true;
+        public string VideoCodec { get; set; } = "h264_amf";
 
         private Process FFmpeg;
         private NamedPipeServerStream OutputPipe;
@@ -61,6 +62,33 @@ namespace SharpReplay
             LogTo.Debug("Thread started with ID {0}", thread.ManagedThreadId);
 
             IsRecording = true;
+        }
+
+        public async Task WriteReplayAsync()
+        {
+            string outPath = $"./out/{DateTime.Now:yyyyMMdd_hhmmss}.mp4";
+
+            LogTo.Info("Writing replay to \"{0}\"", outPath);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(outPath));
+            
+            var curator = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg.exe",
+                    Arguments = $"-i - -c:v {VideoCodec} -b:a 128k {outPath}",
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    CreateNoWindow = true
+                }
+            };
+            curator.Start();
+
+            await WriteReplayAsync(curator.StandardInput.BaseStream, false);
+            await curator.WaitForExitAsync();
+
+            LogTo.Info("Done writing");
         }
 
         public async Task WriteReplayAsync(Stream toStream, bool closeStream = true)
@@ -120,8 +148,8 @@ namespace SharpReplay
             {
                 FileName = "ffmpeg.exe",
                 Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + (RecordSystemAudio ?
-                            @"-f dshow -i audio=""@device_cm_{33D9A762-90C8-11D0-BD43-00A0C911CE86}\wave_{5F5B258C-644B-4ACA-B5DA-26733B50300E}"" " : "") +
-                             "-g 27 -strict experimental -crf 0 -preset ultrafast -b:v 4M -c:v h264_amf " +
+                            @"-f dshow -i audio=""@device_cm_{33D9A762-90C8-11D0-BD43-00A0C911CE86}\wave_{5F5B258C-644B-4ACA-B5DA-26733B50300E}"" -b:a 128k " : "") +
+                            $"-g 27 -strict experimental -crf 0 -preset ultrafast -b:v 4M -c:v {VideoCodec} " +
                            $@"-r {Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                 RedirectStandardInput = true,
                 UseShellExecute = false,
