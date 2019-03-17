@@ -297,7 +297,7 @@ namespace SharpReplay
         {
             byte[] buffer = new byte[OutputPipe.InBufferSize];
 
-            var boxes = new FragmentParser(OutputPipe);
+            var boxes = new BoxParser(OutputPipe);
 
             var headerBoxes = boxes.Take(2).ToArray();
             Mp4Header = headerBoxes.SelectMany(o => o.Data).ToArray();

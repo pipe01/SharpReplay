@@ -23,11 +23,11 @@ namespace SharpReplay
         }
     }
 
-    public class FragmentParser : IEnumerable<Mp4Box>
+    public class BoxParser : IEnumerable<Mp4Box>
     {
         private readonly Stream BaseStream;
 
-        public FragmentParser(Stream stream)
+        public BoxParser(Stream stream)
         {
             this.BaseStream = stream;
         }

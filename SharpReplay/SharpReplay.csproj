@@ -86,7 +86,7 @@
       <Generator>MSBuild:Compile</Generator>
     </ApplicationDefinition>
     <Compile Include="Extensions.cs" />
-    <Compile Include="FragmentParser.cs" />
+    <Compile Include="BoxParser.cs" />
     <Compile Include="Recorder.cs" />
     <Compile Include="UI\Hotkey.cs" />
     <Compile Include="UI\HotkeyEditorControl.xaml.cs">
