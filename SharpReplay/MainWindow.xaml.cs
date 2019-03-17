@@ -18,7 +18,8 @@ namespace SharpReplay
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        private Recorder Recorder = new Recorder();
+        public RecorderOptions Options { get; set; }
+        private Recorder Recorder;
 
 #pragma warning disable CS0067
         public event PropertyChangedEventHandler PropertyChanged;
@@ -36,7 +37,9 @@ namespace SharpReplay
         private async void Window_Initialized(object sender, EventArgs e)
         {
             AudioDevices = await Utils.GetAudioDevices();
+            Options = RecorderOptions.Load("./config.json");
 
+            Recorder = new Recorder(Options);
             await Recorder.StartAsync();
         }
 
@@ -52,6 +55,12 @@ namespace SharpReplay
             await Recorder.StopAsync();
             await Task.Delay(200);
             await Recorder.StartAsync();
+        }
+
+        private async void Window_Closing(object sender, CancelEventArgs e)
+        {
+            if (Recorder.IsRecording)
+                await Recorder.StopAsync();
         }
     }
 }

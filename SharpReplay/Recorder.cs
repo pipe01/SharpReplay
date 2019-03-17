@@ -1,5 +1,7 @@
 ﻿using Anotar.Log4Net;
+using Newtonsoft.Json;
 using Nito.AsyncEx;
+using SharpReplay.UI;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,6 +12,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 
 namespace SharpReplay
 {
@@ -19,6 +22,22 @@ namespace SharpReplay
         public int Framerate { get; set; } = 60;
         public string[] AudioDevices { get; set; } = new string[0];
         public string VideoCodec { get; set; } = "h264_amf";
+
+        public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
+
+        public void Save(string path) => File.WriteAllText(path, JsonConvert.SerializeObject(this));
+
+        public static RecorderOptions Load(string path)
+        {
+            if (!File.Exists(path))
+            {
+                var opt = new RecorderOptions();
+                opt.Save(path);
+                return opt;
+            }
+
+            return JsonConvert.DeserializeObject<RecorderOptions>(File.ReadAllText(path));
+        }
     }
 
     public class Recorder
@@ -50,6 +69,15 @@ namespace SharpReplay
         private byte[] Mp4Header;
         private List<Mp4Box> Footer;
         private DateTimeOffset LastReportedTime;
+
+        public Recorder()
+        {
+        }
+
+        public Recorder(RecorderOptions options)
+        {
+            this.Options = options;
+        }
 
         public async Task StartAsync()
         {

@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -30,5 +31,8 @@ namespace SharpReplay
 
             return tcs.Task;
         }
+
+        public static bool IsEither<T>(this T obj, params T[] possibilities)
+            => possibilities.Any(o => obj.Equals(o));
     }
 }
