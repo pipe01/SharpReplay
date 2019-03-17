@@ -92,7 +92,7 @@ namespace SharpReplay
 
     public class Recorder
     {
-        private readonly struct Fragment
+        private class Fragment
         {
             public DateTimeOffset Time { get; }
             public Mp4Box[] Boxes { get; }
@@ -118,11 +118,9 @@ namespace SharpReplay
         private ContinuousList<Fragment> Fragments;
         private byte[] Mp4Header;
         private List<Mp4Box> Footer;
-        private DateTimeOffset LastReportedTime;
-        private DateTimeOffset StartTime;
 
         private int FragmentCounter;
-        private Timer FragmentTimer;
+        private readonly Timer FragmentTimer;
 
         public Recorder()
         {
@@ -169,7 +167,7 @@ namespace SharpReplay
         {
             LogTo.Debug("Creating pipe");
 
-            FFPipe = new NamedPipeServerStream("ffpipe", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 4098, 0);
+            FFPipe = new NamedPipeServerStream("ffpipe", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 448 * 1024, 0);
 
             string audioArgs = Options.AudioDevices.Length == 0 ? "" :
                 string.Join(" ", Options.AudioDevices?.Select(o => $@"-f dshow -i audio=""{o}""")) +
@@ -199,35 +197,24 @@ namespace SharpReplay
 
             LogTo.Debug("Waiting for FFmpeg to connect to pipe");
 
-            new Thread(() =>
+            if (Options.LogFFmpegOutput)
             {
-                while (!FFmpeg.HasExited)
+                new Thread(() =>
                 {
-                    var line = FFmpeg.StandardError.ReadLine();
-
-                    if (line == null)
-                        continue;
-
-                    if (Options.LogFFmpegOutput)
-                        LogTo.Debug($"[FFMPEG] {line}");
-
-                    if (line.StartsWith("  dts="))
+                    while (!FFmpeg.HasExited)
                     {
-                        string timeStr = FrameTimeRegex.Match(line).Value;
-                        long time = (long)(double.Parse(timeStr, CultureInfo.InvariantCulture) * 1000);
+                        var line = FFmpeg.StandardError.ReadLine();
 
-                        LastReportedTime = DateTimeOffset.FromUnixTimeMilliseconds(time);
-                        FragmentEvent.Set();
+                        if (line != null)
+                            LogTo.Debug($"[FFMPEG] {line}");
                     }
-                }
-            })
-            {
-                IsBackground = true
-            }.Start();
+                })
+                {
+                    IsBackground = true
+                }.Start();
+            }
 
             await FFPipe.WaitForConnectionAsync();
-
-            //FFmpeg.StandardInput.Write("-h");
         }
 
         public async Task<string> WriteReplayAsync()
@@ -238,7 +225,7 @@ namespace SharpReplay
 
             Directory.CreateDirectory(Path.GetDirectoryName(outPath));
 
-            var pipe = new NamedPipeServerStream("outpipe", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 4096);
+            var pipe = new NamedPipeServerStream("outpipe", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 448 * 1024);
 
             var curator = new Process
             {
@@ -328,6 +315,7 @@ namespace SharpReplay
             GC.Collect();
         }
 
+        private int FpsEchoCount;
         private void FragmentTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             if (!IsRecording)
@@ -335,6 +323,9 @@ namespace SharpReplay
 
             int fragmentsPerSecond = FragmentCounter;
             FragmentCounter = 0;
+
+            if (FpsEchoCount++ % 5 == 0)
+                LogTo.Debug("Fragments per second: {0}", fragmentsPerSecond);
 
             int totalFragmentsNeeded = fragmentsPerSecond * (Options.MaxReplayLengthSeconds + 2);
 
@@ -355,8 +346,6 @@ namespace SharpReplay
             Mp4Header = headerBoxes.SelectMany(o => o.Data).ToArray();
 
             Mp4Box lastMoof = default;
-
-            StartTime = DateTimeOffset.Now;
 
             foreach (var box in boxes)
             {
