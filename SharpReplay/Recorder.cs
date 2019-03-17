@@ -32,9 +32,8 @@ namespace SharpReplay
         public bool IsRecording { get; private set; }
 
         public int MaxReplayLengthSeconds { get; set; } = 5;
-        public int Framerate { get; set; } = 30;
-        public bool RecordAudio { get; set; }
-        public string AudioDevice { get; set; }
+        public int Framerate { get; set; } = 60;
+        public string[] AudioDevices { get; set; }
         public string VideoCodec { get; set; } = "h264_amf";
 
         private Process FFmpeg;
@@ -82,13 +81,17 @@ namespace SharpReplay
 
             OutputPipe = new NamedPipeServerStream("ffpipe", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 448 * 1024, 0);
 
+            string audioArgs = 
+                string.Join(" ", AudioDevices?.Select(o => $@"-f dshow -i audio=""{o}""")) + " "+
+                $@"-filter_complex ""{string.Join("", AudioDevices.Select((_, i) => $"[{i + 1}:0]volume = 1[a{i}];"))}{string.Join("", AudioDevices.Select((_, i) => $"[a{i}]"))}amix =inputs={AudioDevices.Length}[a]"" -map 0:v -map ""[a]"" ";
+
             FFmpeg = new Process();
             FFmpeg.StartInfo = new ProcessStartInfo
             {
                 FileName = "ffmpeg.exe",
-                Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + (RecordAudio ?
-                           $@"-f dshow -i audio=""{AudioDevice}"" -b:a 128k " : "") +
-                            $"-g 10 -strict experimental -crf 0 -preset ultrafast -b:v 5M -c:v {VideoCodec} " +
+                Arguments = $"-f gdigrab -framerate {Framerate} -r {Framerate} -i desktop " + 
+                            audioArgs +
+                            $"-b:a 128k -g 10 -strict experimental -crf 0 -preset ultrafast -b:v 5M -c:v {VideoCodec} " +
                            $@"-r {Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                 RedirectStandardInput = true,
                 RedirectStandardError = true,
@@ -152,7 +155,7 @@ namespace SharpReplay
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $@"-i \\.\pipe\outpipe -c:v {VideoCodec} -b:a 128k {outPath}",
+                    Arguments = $@"-i \\.\pipe\outpipe -c:v {VideoCodec} -crf 0 -preset veryslow -b:a 128k {outPath}",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     CreateNoWindow = true

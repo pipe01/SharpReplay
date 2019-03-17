@@ -8,12 +8,25 @@ using System.Threading.Tasks;
 
 namespace SharpReplay
 {
+    public class AudioDevice
+    {
+        public string PrettyName { get; }
+        public string AltName { get; }
+        public bool Enabled { get; set; }
+
+        public AudioDevice(string prettyName, string altName)
+        {
+            this.PrettyName = prettyName;
+            this.AltName = altName;
+        }
+    }
+
     public static class Utils
     {
-        private static Regex IsAudioLineRegex = new Regex(@"^\[.*?\]  ");
-        private static Regex AudioNameRegex = new Regex(@"(?<="").*?(?="")");
+        private readonly static Regex IsAudioLineRegex = new Regex(@"^\[.*?\]  ");
+        private readonly static Regex AudioNameRegex = new Regex(@"(?<="").*?(?="")");
 
-        public static async Task<Tuple<string, string>[]> GetAudioDevices()
+        public static async Task<AudioDevice[]> GetAudioDevices()
         {
             var ffmpeg = new Process
             {
@@ -30,7 +43,7 @@ namespace SharpReplay
             ffmpeg.Start();
             await ffmpeg.WaitForExitAsync();
 
-            var ret = new List<Tuple<string, string>>();
+            var ret = new List<AudioDevice>();
             string error;
 
             using (var reader = new StreamReader(ffmpeg.StandardError.BaseStream, Encoding.UTF8))
@@ -47,7 +60,7 @@ namespace SharpReplay
                     string prettyName = AudioNameRegex.Match(line).Value;
                     string altName = AudioNameRegex.Match(lines[i + 1]).Value;
 
-                    ret.Add(new Tuple<string, string>(prettyName, altName));
+                    ret.Add(new AudioDevice(prettyName, altName));
                     i++;
                 }
             }

@@ -1,6 +1,7 @@
 ﻿using Anotar.Log4Net;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -15,20 +16,24 @@ namespace SharpReplay
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        private Recorder Recorder = new Recorder();
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public AudioDevice[] AudioDevices { get; set; }
+
         public MainWindow()
         {
             InitializeComponent();
-        }
 
-        private Recorder Recorder = new Recorder();
+            this.DataContext = this;
+        }
 
         private async void Button_Click(object sender, RoutedEventArgs e)
         {
-            Recorder.RecordAudio = true;
-            Recorder.AudioDevice = (string)Audio.SelectedValue;
-
+            Recorder.AudioDevices = AudioDevices.Where(o => o.Enabled).Select(o => o.AltName).ToArray();
             await Recorder.StartAsync();
         }
         
@@ -44,8 +49,7 @@ namespace SharpReplay
 
         private async void Window_Initialized(object sender, EventArgs e)
         {
-            Audio.ItemsSource = await Utils.GetAudioDevices();
-            Audio.SelectedIndex = 0;
+            AudioDevices = await Utils.GetAudioDevices();
         }
     }
 }
