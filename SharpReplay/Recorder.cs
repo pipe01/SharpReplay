@@ -39,7 +39,7 @@ namespace SharpReplay
             .Build();
 
 
-        public int MaxReplayLengthSeconds { get; set; } = 5;
+        public int MaxReplayLengthSeconds { get; set; } = 15;
         public int Framerate { get; set; } = 60;
         public string[] AudioDevices { get; set; } = new string[0];
         public HardwareAccel HardwareAcceleration { get; set; }
