@@ -8,10 +8,22 @@
         xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d" Initialized="Window_Initialized" Closing="Window_Closing" Icon="Images/icon.ico"
-        Title="SharpReplay" Height="232" Width="234" ResizeMode="CanMinimize" ShowIconOnTitleBar="False">
+        Title="SharpReplay" Height="232" Width="234" ResizeMode="CanMinimize" ShowIconOnTitleBar="False"
+        StateChanged="MetroWindow_StateChanged" WindowStartupLocation="CenterScreen">
 
     <StackPanel VerticalAlignment="Center">
-        <tb:TaskbarIcon IconSource="Images/icon_bolt.ico" />
+        <tb:TaskbarIcon IconSource="Images/icon_bolt.ico" TrayLeftMouseDown="TaskbarIcon_TrayLeftMouseDown"
+                        ToolTipText="SharpReplay">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <ContextMenu.Items>
+                        <MenuItem Header="Save replay" Click="Save_Click" />
+                        <Separator />
+                        <MenuItem Header="Exit" Click="Exit_Click" />
+                    </ContextMenu.Items>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
 
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
