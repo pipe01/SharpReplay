@@ -17,7 +17,7 @@ namespace SharpReplay
     {
         public int MaxReplayLengthSeconds { get; set; } = 5;
         public int Framerate { get; set; } = 60;
-        public string[] AudioDevices { get; set; }
+        public string[] AudioDevices { get; set; } = new string[0];
         public string VideoCodec { get; set; } = "h264_amf";
     }
 
@@ -86,9 +86,9 @@ namespace SharpReplay
 
             OutputPipe = new NamedPipeServerStream("ffpipe", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 448 * 1024, 0);
 
-            string audioArgs = 
+            string audioArgs = Options.AudioDevices.Length == 0 ? "" :
                 string.Join(" ", Options.AudioDevices?.Select(o => $@"-f dshow -i audio=""{o}""")) + " "+
-                $@"-filter_complex ""{string.Concat(Options.AudioDevices.Select((_, i) => $"[{i + 1}:0]volume = 1[a{i}];"))}{string.Concat(Options.AudioDevices.Select((_, i) => $"[a{i}]"))}amix =inputs={Options.AudioDevices.Length}[a]"" -map 0:v -map ""[a]"" ";
+                $@"-filter_complex ""{string.Concat(Options.AudioDevices.Select((_, i) => $"[{i + 1}:0]volume = 1[a{i}];"))}{string.Concat(Options.AudioDevices.Select((_, i) => $"[a{i}]"))}amix=inputs={Options.AudioDevices.Length}[a]"" -map 0:v -map ""[a]"" ";
 
             FFmpeg = new Process();
             FFmpeg.StartInfo = new ProcessStartInfo

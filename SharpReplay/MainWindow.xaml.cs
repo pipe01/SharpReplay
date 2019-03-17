@@ -20,7 +20,9 @@ namespace SharpReplay
     {
         private Recorder Recorder = new Recorder();
 
+#pragma warning disable CS0067
         public event PropertyChangedEventHandler PropertyChanged;
+#pragma warning restore CS0067
 
         public AudioDevice[] AudioDevices { get; set; }
 
@@ -31,15 +33,11 @@ namespace SharpReplay
             this.DataContext = this;
         }
 
-        private async void Button_Click(object sender, RoutedEventArgs e)
+        private async void Window_Initialized(object sender, EventArgs e)
         {
-            Recorder.Options.AudioDevices = AudioDevices.Where(o => o.Enabled).Select(o => o.AltName).ToArray();
+            AudioDevices = await Utils.GetAudioDevices();
+
             await Recorder.StartAsync();
-        }
-        
-        private async void Stop_Click(object sender, RoutedEventArgs e)
-        {
-            await Recorder.StopAsync();
         }
 
         private async void Save_Click(object sender, RoutedEventArgs e)
@@ -47,9 +45,13 @@ namespace SharpReplay
             await Recorder.WriteReplayAsync();
         }
 
-        private async void Window_Initialized(object sender, EventArgs e)
+        private async void Restart_Click(object sender, RoutedEventArgs e)
         {
-            AudioDevices = await Utils.GetAudioDevices();
+            Recorder.Options.AudioDevices = AudioDevices.Where(o => o.Enabled).Select(o => o.AltName).ToArray();
+
+            await Recorder.StopAsync();
+            await Task.Delay(200);
+            await Recorder.StartAsync();
         }
     }
 }
