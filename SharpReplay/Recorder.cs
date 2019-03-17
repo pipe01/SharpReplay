@@ -308,9 +308,7 @@ namespace SharpReplay
             IsRecording = false;
 
             FFmpeg.Dispose();
-            FFPipe.Disconnect();
             FFPipe.Dispose();
-            FFPipe = null;
 
             GC.Collect();
         }

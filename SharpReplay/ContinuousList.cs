@@ -16,6 +16,7 @@ namespace SharpReplay
         public event EventHandler<T> ItemDropped = delegate { };
 
         public int Capacity { get; private set; }
+        public int Count { get; private set; }
 
         public ContinuousList(int capacity)
         {
@@ -52,13 +53,18 @@ namespace SharpReplay
                 Index = 0;
                 HasLooped = true;
             }
+
+            Count++;
+
+            if (Count > Capacity)
+                Count = Capacity;
         }
 
         public void Clear()
         {
             this.Items = new T[Capacity];
             this.HasLooped = false;
-            this.Index = 0;
+            this.Index = this.Count = 0;
             this.Last = default;
         }
 
