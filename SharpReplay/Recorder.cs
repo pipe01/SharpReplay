@@ -43,7 +43,7 @@ namespace SharpReplay
         public int Framerate { get; set; } = 60;
         public string[] AudioDevices { get; set; } = new string[0];
         public HardwareAccel HardwareAcceleration { get; set; }
-        [Description("If true this compresses captured video on memory, trading reduced memory usage for more CPU usage")]
+        [Description("If disabled this compresses captured video on memory, trading reduced memory usage for more CPU usage")]
         public bool LosslessInMemory { get; set; } = true;
 
         public bool LogFFmpegOutput { get; set; }
