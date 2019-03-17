@@ -25,7 +25,7 @@ namespace SharpReplay
 
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
 
-        public void Save(string path) => File.WriteAllText(path, JsonConvert.SerializeObject(this));
+        public void Save(string path) => File.WriteAllText(path, JsonConvert.SerializeObject(this, Formatting.Indented));
 
         public static RecorderOptions Load(string path)
         {
@@ -69,6 +69,7 @@ namespace SharpReplay
         private byte[] Mp4Header;
         private List<Mp4Box> Footer;
         private DateTimeOffset LastReportedTime;
+        private DateTimeOffset StartTime;
 
         public Recorder()
         {
@@ -89,7 +90,7 @@ namespace SharpReplay
 
             LogTo.Info("Start recording");
 
-            Fragments = new ContinuousList<Fragment>(200);
+            Fragments = new ContinuousList<Fragment>(12 * Options.Framerate);
             Footer = new List<Mp4Box>();
             Mp4Header = null;
 
@@ -246,6 +247,7 @@ namespace SharpReplay
         public async Task StopAsync()
         {
             LogTo.Info("Stopping");
+            double fragsPerSecond = Fragments.Count() / (DateTimeOffset.Now - StartTime).TotalSeconds;
 
             FFmpeg.StandardInput.Write("qqqqqqqqqqqqqqqq");
             await FFmpeg.WaitForExitAsync();
@@ -269,6 +271,8 @@ namespace SharpReplay
             Mp4Header = headerBoxes.SelectMany(o => o.Data).ToArray();
 
             Mp4Box lastMoof = default;
+
+            StartTime = DateTimeOffset.Now;
 
             foreach (var box in boxes)
             {
