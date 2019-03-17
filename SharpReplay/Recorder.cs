@@ -20,6 +20,13 @@ namespace SharpReplay
 {
     public class RecorderOptions
     {
+        public enum HardwareAccel
+        {
+            None,
+            AMD,
+            NVIDIA
+        }
+
         private readonly static IDeserializer Deserializer = new DeserializerBuilder()
             .WithNamingConvention(new CamelCaseNamingConvention())
             .Build();
@@ -28,18 +35,23 @@ namespace SharpReplay
             .WithNamingConvention(new CamelCaseNamingConvention())
             .WithTypeInspector(inner => new CommentGatheringTypeInspector(inner))
             .WithEmissionPhaseObjectGraphVisitor(args => new CommentsObjectGraphVisitor(args.InnerVisitor))
+            .EmitDefaults()
             .Build();
 
 
         public int MaxReplayLengthSeconds { get; set; } = 5;
         public int Framerate { get; set; } = 60;
         public string[] AudioDevices { get; set; } = new string[0];
-        public string VideoCodec { get; set; } = "h264_amf";
+        public HardwareAccel HardwareAcceleration { get; set; }
         [Description("If true this compresses captured video on memory, trading reduced memory usage for more CPU usage")]
         public bool LosslessInMemory { get; set; } = true;
 
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
 
+        [YamlIgnore]
+        public string VideoCodec => "h264" + (
+            HardwareAcceleration == HardwareAccel.AMD ? "_amf" :
+            HardwareAcceleration == HardwareAccel.NVIDIA ? "_nvenc" : "");
 
         public void Save(string path) => File.WriteAllText(path, Serializer.Serialize(this));
 
