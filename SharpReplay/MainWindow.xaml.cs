@@ -33,7 +33,7 @@ namespace SharpReplay
 
         private async void Button_Click(object sender, RoutedEventArgs e)
         {
-            Recorder.AudioDevices = AudioDevices.Where(o => o.Enabled).Select(o => o.AltName).ToArray();
+            Recorder.Options.AudioDevices = AudioDevices.Where(o => o.Enabled).Select(o => o.AltName).ToArray();
             await Recorder.StartAsync();
         }
         
