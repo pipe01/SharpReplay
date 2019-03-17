@@ -26,7 +26,8 @@ namespace SharpReplay
 
             LogTo.FatalException("Unhandled exception", exception);
 
-            MessageBox.Show($"{exception.GetType().FullName}: {exception.Message}\n", "Unhandled exception", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (!Debugger.IsAttached)
+                MessageBox.Show($"{exception.GetType().FullName}: {exception.Message}\n", "Unhandled exception", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         protected override void OnStartup(StartupEventArgs e)

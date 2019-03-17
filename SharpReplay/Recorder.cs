@@ -124,7 +124,7 @@ namespace SharpReplay
 
         public Recorder()
         {
-            this.FragmentTimer = new Timer(1000);
+            this.FragmentTimer = new Timer(5000);
             this.FragmentTimer.Elapsed += this.FragmentTimer_Elapsed;
             this.FragmentTimer.Start();
         }
@@ -144,7 +144,7 @@ namespace SharpReplay
 
             LogTo.Info("Start recording");
 
-            Fragments = new ContinuousList<Fragment>(12 * Options.Framerate);
+            Fragments = new ContinuousList<Fragment>(10);
             Footer = new List<Mp4Box>();
             Mp4Header = null;
 
@@ -180,10 +180,10 @@ namespace SharpReplay
                     FileName = "ffmpeg.exe",
                     Arguments = $"-f gdigrab -framerate {Options.Framerate} -r {Options.Framerate} -i desktop " +
                             audioArgs +
-                            $"-b:a 128k -g 10 -strict experimental -c:v {Options.VideoCodec} {(Options.LosslessInMemory ? "-crf 0 -preset ultrafast" : "")} -b:v 5M " +
+                            $"-b:a 128k -g {DetermineGOP()} -strict experimental -c:v {Options.VideoCodec} {(Options.LosslessInMemory ? "-crf 0 -preset ultrafast" : "")} -b:v 5M " +
                            $@"-r {Options.Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                     RedirectStandardInput = true,
-                    RedirectStandardError = true,
+                    RedirectStandardError = Options.LogFFmpegOutput,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 }
@@ -215,6 +215,11 @@ namespace SharpReplay
             }
 
             await FFPipe.WaitForConnectionAsync();
+        }
+
+        private int DetermineGOP()
+        {
+            return Options.Framerate;
         }
 
         public async Task<string> WriteReplayAsync()
@@ -302,7 +307,18 @@ namespace SharpReplay
 
             FFmpeg.StandardInput.Write("qqqqqqqqqqqq");
 
-            await FFmpeg.WaitForExitAsync();
+            var cts = new CancellationTokenSource(3000);
+
+            try
+            {
+                await FFmpeg.WaitForExitAsync(cts.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                FFmpeg.Kill();
+            }
+            cts.Dispose();
+
             await Task.Delay(1000);
 
             IsRecording = false;
@@ -313,19 +329,17 @@ namespace SharpReplay
             GC.Collect();
         }
 
-        private int FpsEchoCount;
         private void FragmentTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             if (!IsRecording)
                 return;
 
-            int fragmentsPerSecond = FragmentCounter;
+            double fragmentsPerSecond = FragmentCounter / (FragmentTimer.Interval / 1000);
             FragmentCounter = 0;
 
-            if (FpsEchoCount++ % 5 == 0)
-                LogTo.Debug("Fragments per second: {0}", fragmentsPerSecond);
+            LogTo.Debug("Fragments per second: {0}", fragmentsPerSecond);
 
-            int totalFragmentsNeeded = fragmentsPerSecond * (Options.MaxReplayLengthSeconds + 2);
+            int totalFragmentsNeeded = (int)Math.Ceiling(fragmentsPerSecond * (Options.MaxReplayLengthSeconds + 2));
 
             if (totalFragmentsNeeded > Fragments.Capacity)
             {
