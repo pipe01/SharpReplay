@@ -31,6 +31,9 @@ namespace SharpReplay
 
         public MainWindow()
         {
+            if (Environment.GetCommandLineArgs().Contains("--startup"))
+                this.Hide();
+
             InitializeComponent();
 
             this.DataContext = this;
