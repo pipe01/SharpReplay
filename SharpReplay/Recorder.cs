@@ -104,7 +104,10 @@ namespace SharpReplay
             }
         }
 
-        private readonly static Regex FrameTimeRegex = new Regex(@"(?<=dts=)(\d|\.)*?(?= )");
+        private class RecState
+        {
+            public int AudioTrackID, VideoTrackID;
+        }
 
         public bool IsRecording { get; private set; }
 
@@ -118,6 +121,7 @@ namespace SharpReplay
         private ContinuousList<Fragment> Fragments;
         private byte[] Mp4Header;
         private List<Mp4Box> Footer;
+        private RecState State;
 
         private int FragmentCounter;
         private readonly Timer FragmentTimer;
@@ -146,6 +150,7 @@ namespace SharpReplay
 
             Fragments = new ContinuousList<Fragment>(10);
             Footer = new List<Mp4Box>();
+            State = new RecState();
             Mp4Header = null;
 
             await StartPipeAndProcess();
@@ -356,6 +361,26 @@ namespace SharpReplay
 
             var headerBoxes = boxes.Take(2).ToArray();
             Mp4Header = headerBoxes.SelectMany(o => o.Data).ToArray();
+
+            var traks = headerBoxes[1].Children.Where(o => o.Name == "trak");
+
+            byte[] audioStr = "SoundHandler".Select(o => (byte)o).ToArray();
+            byte[] videoStr = "VideoHandler".Select(o => (byte)o).ToArray();
+
+            foreach (var trak in traks)
+            {
+                var hdlr = trak["mdia"]["hdlr"];
+                bool isAudio = hdlr.Data.Contains(audioStr);
+                bool isVideo = hdlr.Data.Contains(videoStr);
+                int trackId = trak["tkhd"].Data.ToInt32BigEndian(58);
+
+                if (isAudio)
+                    State.AudioTrackID = trackId;
+                else if (isVideo)
+                    State.VideoTrackID = trackId;
+                else
+                    throw new InvalidDataException("Invalid TRAK box found: " + BitConverter.ToString(trak.Data));
+            }
 
             Mp4Box lastMoof = default;
 

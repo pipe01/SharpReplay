@@ -21,6 +21,27 @@ namespace SharpReplay
             this.Name = name;
             this.Data = data;
         }
+
+        public IEnumerable<Mp4Box> Children
+        {
+            get
+            {
+                for (int i = 8; i < Data.Length;)
+                {
+                    int childLen = Data.ToInt32BigEndian(i);
+                    string childName = Encoding.UTF8.GetString(Data, i + 4, 4);
+
+                    byte[] childData = new byte[childLen];
+                    Buffer.BlockCopy(Data, i, childData, 0, childLen);
+
+                    i += childLen;
+
+                    yield return new Mp4Box(childName, childData);
+                }
+            }
+        }
+
+        public Mp4Box this[string childName] => Children.First(o => o.Name == childName);
     }
 
     public class BoxParser : IEnumerable<Mp4Box>
@@ -42,7 +63,7 @@ namespace SharpReplay
             {
                 int read = BaseStream.Read(lengthB, 0, 4);
 
-                int length = BitConverter.ToInt32(new[] { lengthB[3], lengthB[2], lengthB[1], lengthB[0] }, 0);
+                int length = lengthB.ToInt32BigEndian();
 
                 if (length == 0)
                     continue;
