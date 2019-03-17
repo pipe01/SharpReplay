@@ -37,8 +37,15 @@ namespace SharpReplay
 
         private async void Window_Initialized(object sender, EventArgs e)
         {
-            AudioDevices = await Utils.GetAudioDevices();
             Options = RecorderOptions.Load("./config.json");
+            AudioDevices = (await Utils.GetAudioDevices());
+
+            foreach (var device in AudioDevices)
+            {
+                device.Enabled = Options.AudioDevices.Contains(device.AltName);
+            }
+
+            SaveHotkey.Hotkey = Options.SaveReplayHotkey;
 
             Recorder = new Recorder(Options);
             await Recorder.StartAsync();
@@ -51,8 +58,6 @@ namespace SharpReplay
 
         private async void Restart_Click(object sender, RoutedEventArgs e)
         {
-            Recorder.Options.AudioDevices = AudioDevices.Where(o => o.Enabled).Select(o => o.AltName).ToArray();
-
             await Recorder.StopAsync();
             await Task.Delay(200);
             await Recorder.StartAsync();
@@ -81,6 +86,23 @@ namespace SharpReplay
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
             this.Close();
+        }
+
+        private void SaveOptions()
+        {
+            Options.Save("./config.json");
+        }
+
+        private void HotkeyEditorControl_HotkeyChanged(object sender, RoutedEventArgs e)
+        {
+            SaveOptions();
+        }
+
+        private void Audio_CheckedChanged(object sender, RoutedEventArgs e)
+        {
+            Options.AudioDevices = AudioDevices.Where(o => o.Enabled).Select(o => o.AltName).ToArray();
+
+            SaveOptions();
         }
     }
 }

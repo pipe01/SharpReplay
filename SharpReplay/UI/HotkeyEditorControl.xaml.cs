@@ -19,6 +19,16 @@ namespace SharpReplay.UI
             set => SetValue(HotkeyProperty, value);
         }
 
+        public static readonly RoutedEvent HotkeyChangedEvent = EventManager.RegisterRoutedEvent(
+            "HotkeyChanged", RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(HotkeyEditorControl));
+
+        // Provide CLR accessors for the event
+        public event RoutedEventHandler HotkeyChanged
+        {
+            add { AddHandler(HotkeyChangedEvent, value); }
+            remove { RemoveHandler(HotkeyChangedEvent, value); }
+        }
+
         public HotkeyEditorControl()
         {
             InitializeComponent();
@@ -58,6 +68,7 @@ namespace SharpReplay.UI
 
             // Set values
             Hotkey = new Hotkey(key, modifiers);
+            RaiseEvent(new RoutedEventArgs(HotkeyChangedEvent));
         }
     }
 }
