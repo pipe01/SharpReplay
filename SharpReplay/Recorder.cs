@@ -38,6 +38,8 @@ namespace SharpReplay
             .EmitDefaults()
             .Build();
 
+        private const string H264Presets = "ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow";
+
 
         public int MaxReplayLengthSeconds { get; set; } = 15;
         public int Framerate { get; set; } = 60;
@@ -45,6 +47,11 @@ namespace SharpReplay
         public HardwareAccel HardwareAcceleration { get; set; }
         [Description("If disabled this compresses captured video on memory, trading reduced memory usage for more CPU usage")]
         public bool LosslessInMemory { get; set; } = true;
+
+        [Description("100 means lossless image, 0 means there's barely any video")]
+        public double OutputQuality { get; set; } = 50;
+        [Description("H.264 preset. From worst to best quality: " + H264Presets)]
+        public string OutputPreset { get; set; } = "slow";
 
         public bool LogFFmpegOutput { get; set; }
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
@@ -58,14 +65,22 @@ namespace SharpReplay
 
         public static RecorderOptions Load(string path)
         {
-            if (!File.Exists(path))
-            {
-                var opt = new RecorderOptions();
-                opt.Save(path);
-                return opt;
-            }
+            RecorderOptions opt;
 
-            return Deserializer.Deserialize<RecorderOptions>(File.ReadAllText(path));
+            if (!File.Exists(path))
+                opt = new RecorderOptions();
+            else
+                opt = Deserializer.Deserialize<RecorderOptions>(File.ReadAllText(path));
+
+            if (opt.OutputQuality < 0 || opt.OutputQuality > 100)
+                opt.OutputQuality = 50;
+
+            if (!H264Presets.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries).Contains(opt.OutputPreset))
+                opt.OutputPreset = "slow";
+
+            opt.Save(path);
+
+            return opt;
         }
     }
 
@@ -219,7 +234,7 @@ namespace SharpReplay
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $@"-i \\.\pipe\outpipe -c:v {Options.VideoCodec} -crf 0 -preset veryslow -b:a 128k {outPath}",
+                    Arguments = $@"-i \\.\pipe\outpipe -c:v {Options.VideoCodec} -crf {(int)(Options.OutputQuality * 51)} -preset {Options.OutputPreset} -b:a 128k {outPath}",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     CreateNoWindow = true
