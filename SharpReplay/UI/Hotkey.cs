@@ -1,17 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 using System.Windows.Input;
 
 namespace SharpReplay.UI
 {
     public class Hotkey
     {
-        public Key Key { get; }
+        public Key Key { get; set; }
 
-        public ModifierKeys Modifiers { get; }
+        public ModifierKeys Modifiers { get; set; }
+
+        public Hotkey()
+        {
+        }
 
         public Hotkey(Key key, ModifierKeys modifiers)
         {

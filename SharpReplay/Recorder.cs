@@ -1,9 +1,9 @@
 ﻿using Anotar.Log4Net;
-using Newtonsoft.Json;
 using Nito.AsyncEx;
 using SharpReplay.UI;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -13,20 +13,35 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace SharpReplay
 {
     public class RecorderOptions
     {
+        private readonly static IDeserializer Deserializer = new DeserializerBuilder()
+            .WithNamingConvention(new CamelCaseNamingConvention())
+            .Build();
+
+        private static readonly ISerializer Serializer = new SerializerBuilder()
+            .WithNamingConvention(new CamelCaseNamingConvention())
+            .WithTypeInspector(inner => new CommentGatheringTypeInspector(inner))
+            .WithEmissionPhaseObjectGraphVisitor(args => new CommentsObjectGraphVisitor(args.InnerVisitor))
+            .Build();
+
+
         public int MaxReplayLengthSeconds { get; set; } = 5;
         public int Framerate { get; set; } = 60;
         public string[] AudioDevices { get; set; } = new string[0];
         public string VideoCodec { get; set; } = "h264_amf";
+        [Description("If true this compresses captured video on memory, trading reduced memory usage for more CPU usage")]
         public bool LosslessInMemory { get; set; } = true;
 
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
 
-        public void Save(string path) => File.WriteAllText(path, JsonConvert.SerializeObject(this, Formatting.Indented));
+
+        public void Save(string path) => File.WriteAllText(path, Serializer.Serialize(this));
 
         public static RecorderOptions Load(string path)
         {
@@ -37,7 +52,7 @@ namespace SharpReplay
                 return opt;
             }
 
-            return JsonConvert.DeserializeObject<RecorderOptions>(File.ReadAllText(path));
+            return Deserializer.Deserialize<RecorderOptions>(File.ReadAllText(path));
         }
     }
 

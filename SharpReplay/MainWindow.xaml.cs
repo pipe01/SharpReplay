@@ -20,6 +20,8 @@ namespace SharpReplay
     /// </summary>
     public partial class MainWindow : MetroWindow, INotifyPropertyChanged
     {
+        private const string ConfigFile = "./config.yml";
+
         public RecorderOptions Options { get; set; }
         private Recorder Recorder;
 
@@ -41,7 +43,7 @@ namespace SharpReplay
 
         private async void Window_Initialized(object sender, EventArgs e)
         {
-            Options = RecorderOptions.Load("./config.json");
+            Options = RecorderOptions.Load(ConfigFile);
             AudioDevices = (await Utils.GetAudioDevices());
 
             foreach (var device in AudioDevices)
@@ -96,7 +98,7 @@ namespace SharpReplay
 
         private void SaveOptions()
         {
-            Options.Save("./config.json");
+            Options.Save(ConfigFile);
 
             HotkeyManager.Current.AddOrReplace("SaveReplay", Options.SaveReplayHotkey, async (_, e) =>
             {
