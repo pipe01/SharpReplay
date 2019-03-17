@@ -58,7 +58,9 @@ namespace SharpReplay
                 }
                 catch (Exception ex)
                 {
-                    LogTo.FatalException("Recording error", ex);
+                    if (!(ex is ObjectDisposedException))
+                        LogTo.FatalException("Recording error", ex);
+
                     yield break;
                 }
 
