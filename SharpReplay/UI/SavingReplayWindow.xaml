@@ -19,6 +19,8 @@
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
+
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Window.Resources>
     
     <Window.Triggers>
@@ -41,8 +43,24 @@
     </Window.Triggers>
 
     <Grid Margin="10">
-        <TextBlock FontFamily="Segoe UI Light, Lucida Sans Unicode, Verdana" FontSize="30" Grid.ColumnSpan="2">
+        <TextBlock Visibility="{Binding IsNotSaved, Converter={StaticResource BoolToVisibilityConverter}}"
+                   FontFamily="Segoe UI Light" FontSize="30">
             Saving replay...
         </TextBlock>
+
+        <Grid Visibility="{Binding IsSaved, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            
+            <TextBlock Grid.Column="0" FontFamily="Segoe UI Light" FontSize="30">
+                Saved
+            </TextBlock>
+
+            <Button Grid.Column="1" Margin="10 0 10 0" FontFamily="Segoe UI" FontSize="14" Click="Open_Click">
+                Open
+            </Button>
+        </Grid>
     </Grid>
 </Window>

@@ -201,7 +201,7 @@ namespace SharpReplay
             FFmpeg.StandardInput.Write("-h");
         }
 
-        public async Task WriteReplayAsync()
+        public async Task<string> WriteReplayAsync()
         {
             LogTo.Debug("Current time: {0}", DateTimeOffset.Now.ToUnixTimeMilliseconds());
             LogTo.Debug("Last fragment time: {0}", Fragments.Last.Time);
@@ -237,6 +237,8 @@ namespace SharpReplay
 
             LogTo.Info("Done writing");
             await StartAsync();
+
+            return Path.GetFullPath(outPath);
         }
 
         public async Task WriteReplayAsync(Stream toStream, bool closeStream = true)

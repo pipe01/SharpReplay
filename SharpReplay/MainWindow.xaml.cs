@@ -74,8 +74,10 @@ namespace SharpReplay
             window.Show();
             await Task.Delay(500);
 
-            await Recorder.WriteReplayAsync();
+            window.ReplayPath = await Recorder.WriteReplayAsync();
+            window.IsSaved = true;
 
+            await Task.Delay(2000);
             window.End();
         }
 
