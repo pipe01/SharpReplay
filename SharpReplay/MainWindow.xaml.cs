@@ -1,5 +1,6 @@
 ﻿using Anotar.Log4Net;
 using MahApps.Metro.Controls;
+using NHotkey.Wpf;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -47,6 +48,8 @@ namespace SharpReplay
 
             SaveHotkey.Hotkey = Options.SaveReplayHotkey;
 
+            SaveOptions();
+
             Recorder = new Recorder(Options);
             await Recorder.StartAsync();
         }
@@ -91,6 +94,12 @@ namespace SharpReplay
         private void SaveOptions()
         {
             Options.Save("./config.json");
+
+            HotkeyManager.Current.AddOrReplace("SaveReplay", Options.SaveReplayHotkey, async (_, e) =>
+            {
+                e.Handled = true;
+                await Recorder.WriteReplayAsync();
+            });
         }
 
         private void HotkeyEditorControl_HotkeyChanged(object sender, RoutedEventArgs e)

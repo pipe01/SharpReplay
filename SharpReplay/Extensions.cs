@@ -1,4 +1,8 @@
-﻿using System.Diagnostics;
+﻿using NHotkey;
+using NHotkey.Wpf;
+using SharpReplay.UI;
+using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -34,5 +38,8 @@ namespace SharpReplay
 
         public static bool IsEither<T>(this T obj, params T[] possibilities)
             => possibilities.Any(o => obj.Equals(o));
+
+        public static void AddOrReplace(this HotkeyManager man, string name, Hotkey hotkey, EventHandler<HotkeyEventArgs> handler)
+            => man.AddOrReplace(name, hotkey.Key, hotkey.Modifiers, handler);
     }
 }

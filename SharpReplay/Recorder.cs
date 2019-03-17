@@ -54,7 +54,7 @@ namespace SharpReplay
             }
         }
 
-        private readonly static Regex FrameTimeRegex = new Regex("(?<=dts=).*?(?= )");
+        private readonly static Regex FrameTimeRegex = new Regex(@"(?<=dts=)(\d|\.)*?(?= )");
 
         public bool IsRecording { get; private set; }
 
