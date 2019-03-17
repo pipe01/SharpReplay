@@ -57,20 +57,24 @@ namespace SharpReplay
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
 
         [YamlIgnore]
-        public string VideoCodec => "h264" + (
-            HardwareAcceleration == HardwareAccel.AMD ? "_amf" :
-            HardwareAcceleration == HardwareAccel.NVIDIA ? "_nvenc" : "");
+        public string VideoCodec => "h264_" + HardwareAcceleration.GetH264Suffix();
 
         public void Save(string path) => File.WriteAllText(path, Serializer.Serialize(this));
 
-        public static RecorderOptions Load(string path)
+        public static RecorderOptions Load(string path, out bool exists)
         {
             RecorderOptions opt;
 
             if (!File.Exists(path))
+            {
                 opt = new RecorderOptions();
+                exists = false;
+            }
             else
+            {
                 opt = Deserializer.Deserialize<RecorderOptions>(File.ReadAllText(path));
+                exists = true;
+            }
 
             if (opt.OutputQuality < 0 || opt.OutputQuality > 100)
                 opt.OutputQuality = 50;
@@ -266,7 +270,7 @@ namespace SharpReplay
             LogTo.Debug("Waiting for one more fragment");
             await KeyframeEvent.WaitAsync();
 
-            toStream.Write(Mp4Header, 0, Mp4Header.Length);
+            await toStream.WriteAsync(Mp4Header, 0, Mp4Header.Length);
 
             await StopAsync();
             
@@ -276,14 +280,14 @@ namespace SharpReplay
             {
                 foreach (var box in item.Boxes)
                 {
-                    toStream.Write(box.Data, 0, box.Data.Length);
+                    await toStream.WriteAsync(box.Data, 0, box.Data.Length);
                 }
 
                 count++;
             }
 
             byte[] footer = Footer.SelectMany(o => o.Data).ToArray();
-            toStream.Write(footer, 0, footer.Length);
+            await toStream.WriteAsync(footer, 0, footer.Length);
 
             if (closeStream)
                 toStream.Dispose();
