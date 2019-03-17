@@ -22,6 +22,7 @@ namespace SharpReplay
         public int Framerate { get; set; } = 60;
         public string[] AudioDevices { get; set; } = new string[0];
         public string VideoCodec { get; set; } = "h264_amf";
+        public bool LosslessInMemory { get; set; } = true;
 
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
 
@@ -125,7 +126,7 @@ namespace SharpReplay
                 FileName = "ffmpeg.exe",
                 Arguments = $"-f gdigrab -framerate {Options.Framerate} -r {Options.Framerate} -i desktop " + 
                             audioArgs +
-                            $"-b:a 128k -g 10 -strict experimental -crf 0 -preset ultrafast -b:v 5M -c:v {Options.VideoCodec} " +
+                            $"-b:a 128k -g 10 -strict experimental {(Options.LosslessInMemory ? "-crf 0 -preset ultrafast" : "")} -b:v 5M -c:v {Options.VideoCodec} " +
                            $@"-r {Options.Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                 RedirectStandardInput = true,
                 RedirectStandardError = true,
