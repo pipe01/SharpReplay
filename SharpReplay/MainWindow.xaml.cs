@@ -1,6 +1,7 @@
 ﻿using Anotar.Log4Net;
 using MahApps.Metro.Controls;
 using NHotkey.Wpf;
+using SharpReplay.UI;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -59,16 +60,28 @@ namespace SharpReplay
             await Recorder.StartAsync();
         }
 
-        private async void Save_Click(object sender, RoutedEventArgs e)
-        {
-            await Recorder.WriteReplayAsync();
-        }
-
         private async void Restart_Click(object sender, RoutedEventArgs e)
         {
             await Recorder.StopAsync();
             await Task.Delay(200);
             await Recorder.StartAsync();
+        }
+
+        private async Task SaveReplay()
+        {
+            var window = new SavingReplayWindow();
+
+            window.Show();
+            await Task.Delay(500);
+
+            await Recorder.WriteReplayAsync();
+
+            window.End();
+        }
+
+        private async void Save_Click(object sender, RoutedEventArgs e)
+        {
+            await SaveReplay();
         }
 
         private async void Window_Closing(object sender, CancelEventArgs e)
@@ -102,8 +115,11 @@ namespace SharpReplay
 
             HotkeyManager.Current.AddOrReplace("SaveReplay", Options.SaveReplayHotkey, async (_, e) =>
             {
+                if (!Recorder.IsRecording)
+                    return;
+
                 e.Handled = true;
-                await Recorder.WriteReplayAsync();
+                await SaveReplay();
             });
         }
 
@@ -117,6 +133,11 @@ namespace SharpReplay
             Options.AudioDevices = AudioDevices.Where(o => o.Enabled).Select(o => o.AltName).ToArray();
 
             SaveOptions();
+        }
+
+        private void MetroWindow_Closed(object sender, EventArgs e)
+        {
+            Application.Current.Shutdown();
         }
     }
 }

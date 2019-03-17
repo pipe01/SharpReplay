@@ -46,6 +46,7 @@ namespace SharpReplay
         [Description("If true this compresses captured video on memory, trading reduced memory usage for more CPU usage")]
         public bool LosslessInMemory { get; set; } = true;
 
+        public bool LogFFmpegOutput { get; set; }
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
 
         [YamlIgnore]
@@ -178,7 +179,8 @@ namespace SharpReplay
                     if (line == null)
                         continue;
 
-                    LogTo.Debug($"[FFMPEG] {line}");
+                    if (Options.LogFFmpegOutput)
+                        LogTo.Debug($"[FFMPEG] {line}");
 
                     if (line.StartsWith("  dts="))
                     {
@@ -304,7 +306,8 @@ namespace SharpReplay
 
             foreach (var box in boxes)
             {
-                LogTo.Debug("Box: " + box.Name);
+                if (Options.LogFFmpegOutput)
+                    LogTo.Debug("Box: " + box.Name);
 
                 if (box.Name == "moof")
                 {

@@ -65,7 +65,9 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Management" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Core" />
@@ -90,6 +92,10 @@
     <Compile Include="UI\HotkeyEditorControl.xaml.cs">
       <DependentUpon>HotkeyEditorControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="UI\SavingReplayWindow.xaml.cs">
+      <DependentUpon>SavingReplayWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UI\WpfScreen.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="YamlComments.cs" />
     <Page Include="MainWindow.xaml">
@@ -106,6 +112,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Page Include="UI\HotkeyEditorControl.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UI\SavingReplayWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>

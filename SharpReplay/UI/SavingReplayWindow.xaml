@@ -1,0 +1,48 @@
+﻿<Window x:Class="SharpReplay.UI.SavingReplayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SharpReplay.UI"
+        xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+        mc:Ignorable="d" Topmost="True"  WindowStyle="None" ResizeMode="NoResize"
+        Title="SavingReplayWindow" Height="60" Width="240" ShowInTaskbar="False">
+
+    <Window.Resources>
+        <Storyboard x:Key="CloseAnim" Completed="Storyboard_Completed">
+            <DoubleAnimation
+                            Storyboard.Target="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}"
+                            Storyboard.TargetProperty="(Window.Left)" From="{Binding EndLeft}" To="{Binding StartLeft}"
+                            Duration="0:0:0.5" Timeline.DesiredFrameRate="30" FillBehavior="Stop">
+                <DoubleAnimation.EasingFunction>
+                    <QuadraticEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </Window.Resources>
+    
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <EventTrigger.Actions>
+                <BeginStoryboard>
+                    <Storyboard BeginTime="0">
+                        <DoubleAnimation
+                            Storyboard.Target="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}"
+                            Storyboard.TargetProperty="(Window.Left)" From="{Binding StartLeft}" To="{Binding EndLeft}"
+                            Duration="0:0:0.5" Timeline.DesiredFrameRate="30" FillBehavior="Stop">
+                            <DoubleAnimation.EasingFunction>
+                                <QuadraticEase EasingMode="EaseOut" />
+                            </DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger.Actions>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <Grid Margin="10">
+        <TextBlock FontFamily="Segoe UI Light, Lucida Sans Unicode, Verdana" FontSize="30" Grid.ColumnSpan="2">
+            Saving replay...
+        </TextBlock>
+    </Grid>
+</Window>
