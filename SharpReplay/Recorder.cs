@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using Timer = System.Timers.Timer;
 
 namespace SharpReplay
 {
@@ -108,7 +109,7 @@ namespace SharpReplay
 
         public RecorderOptions Options { get; set; } = new RecorderOptions();
 
-        private readonly AsyncAutoResetEvent KeyframeEvent = new AsyncAutoResetEvent();
+        private readonly AsyncAutoResetEvent FragmentEvent = new AsyncAutoResetEvent();
 
         private Process FFmpeg;
         private NamedPipeServerStream OutputPipe;
@@ -119,11 +120,17 @@ namespace SharpReplay
         private DateTimeOffset LastReportedTime;
         private DateTimeOffset StartTime;
 
+        private int FragmentCounter;
+        private Timer FragmentTimer;
+
         public Recorder()
         {
+            this.FragmentTimer = new Timer(1000);
+            this.FragmentTimer.Elapsed += this.FragmentTimer_Elapsed;
+            this.FragmentTimer.Start();
         }
 
-        public Recorder(RecorderOptions options)
+        public Recorder(RecorderOptions options) : this()
         {
             this.Options = options;
         }
@@ -173,7 +180,7 @@ namespace SharpReplay
                 FileName = "ffmpeg.exe",
                 Arguments = $"-f gdigrab -framerate {Options.Framerate} -r {Options.Framerate} -i desktop " + 
                             audioArgs +
-                            $"-b:a 128k -g 10 -strict experimental {(Options.LosslessInMemory ? "-crf 0 -preset ultrafast" : "")} -b:v 5M -c:v {Options.VideoCodec} " +
+                            $"-b:a 128k -g 1 -strict experimental {(Options.LosslessInMemory ? "-crf 0 -preset ultrafast" : "")} -b:v 5M -c:v {Options.VideoCodec} " +
                            $@"-r {Options.Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                 RedirectStandardInput = true,
                 RedirectStandardError = true,
@@ -207,7 +214,7 @@ namespace SharpReplay
                         long time = (long)(double.Parse(timeStr, CultureInfo.InvariantCulture) * 1000);
 
                         LastReportedTime = DateTimeOffset.FromUnixTimeMilliseconds(time);
-                        KeyframeEvent.Set();
+                        FragmentEvent.Set();
                     }
                 }
             })
@@ -217,7 +224,7 @@ namespace SharpReplay
 
             await OutputPipe.WaitForConnectionAsync();
 
-            FFmpeg.StandardInput.Write("-h");
+            //FFmpeg.StandardInput.Write("-h");
         }
 
         public async Task<string> WriteReplayAsync()
@@ -272,7 +279,7 @@ namespace SharpReplay
             LogTo.Info("Writing replay");
 
             LogTo.Debug("Waiting for one more fragment");
-            await KeyframeEvent.WaitAsync();
+            await FragmentEvent.WaitAsync();
 
             await toStream.WriteAsync(Mp4Header, 0, Mp4Header.Length);
 
@@ -316,6 +323,23 @@ namespace SharpReplay
             GC.Collect();
         }
 
+        private void FragmentTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (!IsRecording)
+                return;
+
+            int fragmentsPerSecond = FragmentCounter;
+            FragmentCounter = 0;
+
+            int totalFragmentsNeeded = fragmentsPerSecond * Options.MaxReplayLengthSeconds;
+
+            if (totalFragmentsNeeded > Fragments.Capacity)
+            {
+                LogTo.Debug("Resizing fragments buffer to {0} in order to to fit {1} frags/s", totalFragmentsNeeded, fragmentsPerSecond);
+                Fragments.SetCapacity(totalFragmentsNeeded);
+            }
+        }
+
         private void FragmentsThread()
         {
             byte[] buffer = new byte[OutputPipe.InBufferSize];
@@ -332,7 +356,7 @@ namespace SharpReplay
             foreach (var box in boxes)
             {
                 if (Options.LogFFmpegOutput)
-                    LogTo.Debug("Box: " + box.Name);
+                    LogTo.Debug(DateTimeOffset.Now.ToUnixTimeMilliseconds() + " Box: " + box.Name);
 
                 if (box.Name == "moof")
                 {
@@ -340,7 +364,9 @@ namespace SharpReplay
                 }
                 else if (box.Name == "mdat")
                 {
-                    Fragments.Add(new Fragment(LastReportedTime, new[] { lastMoof, box }));
+                    Fragments.Add(new Fragment(DateTimeOffset.Now, new[] { lastMoof, box }));
+                    FragmentCounter++;
+                    FragmentEvent.Set();
                 }
                 else
                 {

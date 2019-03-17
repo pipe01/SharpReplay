@@ -15,12 +15,27 @@ namespace SharpReplay
 
         public event EventHandler<T> ItemDropped = delegate { };
 
-        private readonly int Capacity;
+        public int Capacity { get; private set; }
 
         public ContinuousList(int capacity)
         {
             this.Capacity = capacity;
             this.Items = new T[capacity];
+        }
+
+        public void SetCapacity(int capacity)
+        {
+            int previousCapacity = this.Capacity;
+
+            this.Capacity = capacity;
+            Array.Resize(ref Items, capacity);
+
+            if (HasLooped)
+            {
+                int toBeMoved = previousCapacity - Index;
+                Array.Copy(Items, Index, Items, Items.Length - toBeMoved, toBeMoved);
+                Index += toBeMoved;
+            }
         }
 
         public void Add(T item)

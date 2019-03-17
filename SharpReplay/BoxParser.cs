@@ -44,6 +44,9 @@ namespace SharpReplay
 
                 int length = BitConverter.ToInt32(new[] { lengthB[3], lengthB[2], lengthB[1], lengthB[0] }, 0);
 
+                if (length == 0)
+                    continue;
+
                 data = new byte[length];
 
                 BaseStream.Read(nameB, 0, 4);
