@@ -73,5 +73,12 @@ namespace SharpReplay
 
             return false;
         }
+
+        public static T[] CloneArray<T>(this T[] arr)
+        {
+            var newArr = new T[arr.Length];
+            Array.Copy(arr, newArr, arr.Length);
+            return newArr;
+        }
     }
 }

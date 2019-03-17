@@ -9,6 +9,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -113,14 +114,13 @@ namespace SharpReplay
 
         public RecorderOptions Options { get; set; } = new RecorderOptions();
 
-        private readonly AsyncAutoResetEvent FragmentEvent = new AsyncAutoResetEvent();
+        private readonly AsyncManualResetEvent FragmentEvent = new AsyncManualResetEvent();
 
         private Process FFmpeg;
         private NamedPipeServerStream FFPipe;
 
         private ContinuousList<Fragment> Fragments;
         private byte[] Mp4Header;
-        private List<Mp4Box> Footer;
         private RecState State;
 
         private int FragmentCounter;
@@ -149,7 +149,6 @@ namespace SharpReplay
             LogTo.Info("Start recording");
 
             Fragments = new ContinuousList<Fragment>(10);
-            Footer = new List<Mp4Box>();
             State = new RecState();
             Mp4Header = null;
 
@@ -276,6 +275,7 @@ namespace SharpReplay
             LogTo.Info("Writing replay");
 
             LogTo.Debug("Waiting for one more fragment");
+            FragmentEvent.Reset();
             await FragmentEvent.WaitAsync();
 
             LogTo.Debug("Current time: {0}", DateTimeOffset.Now.ToUnixTimeMilliseconds());
@@ -284,7 +284,7 @@ namespace SharpReplay
             await toStream.WriteAsync(Mp4Header, 0, Mp4Header.Length);
 
             await StopAsync();
-            
+
             var frags = Fragments.Where(o => (Fragments.Last.Time - o.Time).TotalSeconds < Options.MaxReplayLengthSeconds);
             int count = 0;
             foreach (var item in frags)
@@ -296,9 +296,6 @@ namespace SharpReplay
 
                 count++;
             }
-
-            byte[] footer = Footer.SelectMany(o => o.Data).ToArray();
-            await toStream.WriteAsync(footer, 0, footer.Length);
 
             if (closeStream)
                 toStream.Dispose();
@@ -362,46 +359,43 @@ namespace SharpReplay
             var headerBoxes = boxes.Take(2).ToArray();
             Mp4Header = headerBoxes.SelectMany(o => o.Data).ToArray();
 
-            var traks = headerBoxes[1].Children.Where(o => o.Name == "trak");
-
-            byte[] audioStr = "SoundHandler".Select(o => (byte)o).ToArray();
-            byte[] videoStr = "VideoHandler".Select(o => (byte)o).ToArray();
-
-            foreach (var trak in traks)
+            foreach (var trak in headerBoxes[1].Children.Where(o => o.Name == "trak"))
             {
                 var hdlr = trak["mdia"]["hdlr"];
-                bool isAudio = hdlr.Data.Contains(audioStr);
-                bool isVideo = hdlr.Data.Contains(videoStr);
                 int trackId = trak["tkhd"].Data.ToInt32BigEndian(58);
 
-                if (isAudio)
+                if (hdlr.Data.Contains(Encoding.UTF8.GetBytes("SoundHandler")))
                     State.AudioTrackID = trackId;
-                else if (isVideo)
+                else if (hdlr.Data.Contains(Encoding.UTF8.GetBytes("VideoHandler")))
                     State.VideoTrackID = trackId;
                 else
                     throw new InvalidDataException("Invalid TRAK box found: " + BitConverter.ToString(trak.Data));
             }
 
-            Mp4Box lastMoof = default;
+            Mp4Box[] fragBoxes = new Mp4Box[Options.AudioDevices.Length > 0 ? 4 : 2];
+            int boxCounter = 0;
 
             foreach (var box in boxes)
             {
                 if (Options.LogFFmpegOutput)
-                    LogTo.Debug(DateTimeOffset.Now.ToUnixTimeMilliseconds() + " Box: " + box.Name);
+                    LogTo.Debug("Box: " + box.Name);
 
-                if (box.Name == "moof")
+                if (box.Name == "moof" || box.Name == "mdat")
                 {
-                    lastMoof = box;
-                }
-                else if (box.Name == "mdat")
-                {
-                    Fragments.Add(new Fragment(DateTimeOffset.Now, new[] { lastMoof, box }));
-                    FragmentCounter++;
-                    FragmentEvent.Set();
-                }
-                else
-                {
-                    Footer.Add(box);
+                    fragBoxes[boxCounter++] = box;
+
+                    if (boxCounter == fragBoxes.Length)
+                    {
+                        boxCounter = 0;
+
+                        Fragments.Add(new Fragment(DateTimeOffset.Now, fragBoxes));
+                        FragmentCounter++;
+                        FragmentEvent.Set();
+
+                        fragBoxes = new Mp4Box[fragBoxes.Length];
+
+                        LogTo.Debug("New fragment");
+                    }
                 }
             }
         }
