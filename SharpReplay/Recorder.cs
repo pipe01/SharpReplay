@@ -238,12 +238,16 @@ namespace SharpReplay
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $@"-i \\.\pipe\outpipe -c:v {Options.VideoCodec} -crf {(int)(Options.OutputQuality * 51)} -preset {Options.OutputPreset} -b:a 128k {outPath}",
+                    Arguments = $@"-i \\.\pipe\outpipe -c:v {Options.VideoCodec} -crf {(int)(51 - (Options.OutputQuality * 51))} -preset {Options.OutputPreset} -b:a 128k {outPath}",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     CreateNoWindow = true
                 }
             };
+
+            LogTo.Debug("Launching FFmpeg with arguments:");
+            LogTo.Debug(curator.StartInfo.Arguments);
+
             curator.Start();
 
             await pipe.WaitForConnectionAsync();

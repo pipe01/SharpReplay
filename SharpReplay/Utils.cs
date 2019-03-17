@@ -67,5 +67,26 @@ namespace SharpReplay
 
             return ret.ToArray();
         }
+
+        public static async Task<bool> IsAcceleratorAvailable(RecorderOptions.HardwareAccel accel)
+        {
+            string codec = "h264_" + accel.GetH264Suffix();
+
+            var ffmpeg = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg.exe",
+                    Arguments = $"-f lavfi -i color=s=640x480:d=0 -c:v {codec} -f ismv -",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            ffmpeg.Start();
+            await ffmpeg.WaitForExitAsync();
+
+            return ffmpeg.ExitCode == 0;
+        }
     }
 }

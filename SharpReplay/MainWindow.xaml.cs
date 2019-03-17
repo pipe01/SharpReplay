@@ -1,16 +1,9 @@
-﻿using Anotar.Log4Net;
-using MahApps.Metro.Controls;
+﻿using MahApps.Metro.Controls;
 using NHotkey.Wpf;
 using SharpReplay.UI;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
-using System.IO.Pipes;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -44,7 +37,29 @@ namespace SharpReplay
 
         private async void Window_Initialized(object sender, EventArgs e)
         {
-            Options = RecorderOptions.Load(ConfigFile);
+            Options = RecorderOptions.Load(ConfigFile, out var exists);
+
+            if (!exists)
+            {
+                bool amd = await Utils.IsAcceleratorAvailable(RecorderOptions.HardwareAccel.AMD);
+
+                if (amd)
+                {
+                    Options.HardwareAcceleration = RecorderOptions.HardwareAccel.AMD;
+                }
+                else
+                {
+                    bool nvidia = await Utils.IsAcceleratorAvailable(RecorderOptions.HardwareAccel.NVIDIA);
+
+                    if (nvidia)
+                    {
+                        Options.HardwareAcceleration = RecorderOptions.HardwareAccel.NVIDIA;
+                    }
+                }
+
+                Options.Save(ConfigFile);
+            }
+
             AudioDevices = (await Utils.GetAudioDevices());
 
             foreach (var device in AudioDevices)
@@ -70,9 +85,7 @@ namespace SharpReplay
         private async Task SaveReplay()
         {
             var window = new SavingReplayWindow();
-
             window.Show();
-            await Task.Delay(500);
 
             window.ReplayPath = await Recorder.WriteReplayAsync();
             window.IsSaved = true;

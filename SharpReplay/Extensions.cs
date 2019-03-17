@@ -41,5 +41,9 @@ namespace SharpReplay
 
         public static void AddOrReplace(this HotkeyManager man, string name, Hotkey hotkey, EventHandler<HotkeyEventArgs> handler)
             => man.AddOrReplace(name, hotkey.Key, hotkey.Modifiers, handler);
+
+        public static string GetH264Suffix(this RecorderOptions.HardwareAccel accel)
+            => accel == RecorderOptions.HardwareAccel.AMD ? "amf" :
+               accel == RecorderOptions.HardwareAccel.NVIDIA ? "nvenc" : null;
     }
 }
