@@ -6,8 +6,8 @@
         xmlns:local="clr-namespace:SharpReplay"
         xmlns:ui="clr-namespace:SharpReplay.UI"
         xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
-        mc:Ignorable="d" Initialized="Window_Initialized" Closing="Window_Closing"
-        Title="SharpReplay" Height="232" Width="234" ResizeMode="CanMinimize">
+        mc:Ignorable="d" Initialized="Window_Initialized" Closing="Window_Closing" Icon="Images/icon.ico"
+        Title="SharpReplay" Height="232" Width="234" ResizeMode="CanMinimize" ShowIconOnTitleBar="False">
     <StackPanel VerticalAlignment="Center">
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
             <TextBlock VerticalAlignment="Center">Save replay:</TextBlock>
