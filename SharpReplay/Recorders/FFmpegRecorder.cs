@@ -1,110 +1,20 @@
 ﻿using Anotar.Log4Net;
 using Nito.AsyncEx;
-using SharpReplay.UI;
+using SharpReplay.Models;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Input;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
 using Timer = System.Timers.Timer;
 
-namespace SharpReplay
+namespace SharpReplay.Recorders
 {
-    public class RecorderOptions
+    public class FFmpegRecorder : IRecorder
     {
-        public enum HardwareAccel
-        {
-            None,
-            AMD,
-            NVIDIA
-        }
-
-        private readonly static IDeserializer Deserializer = new DeserializerBuilder()
-            .WithNamingConvention(new CamelCaseNamingConvention())
-            .Build();
-
-        private static readonly ISerializer Serializer = new SerializerBuilder()
-            .WithNamingConvention(new CamelCaseNamingConvention())
-            .WithTypeInspector(inner => new CommentGatheringTypeInspector(inner))
-            .WithEmissionPhaseObjectGraphVisitor(args => new CommentsObjectGraphVisitor(args.InnerVisitor))
-            .EmitDefaults()
-            .Build();
-
-        private const string H264Presets = "ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow";
-
-
-        public int MaxReplayLengthSeconds { get; set; } = 15;
-        public int Framerate { get; set; } = 60;
-        public string[] AudioDevices { get; set; } = new string[0];
-        public HardwareAccel HardwareAcceleration { get; set; }
-        [Description("If disabled this compresses captured video on memory, trading reduced memory usage for more CPU usage")]
-        public bool LosslessInMemory { get; set; } = true;
-
-        [Description("100 means lossless image, 0 means there's barely any video")]
-        public double OutputQuality { get; set; } = 50;
-        [Description("H.264 preset. From worst to best quality: " + H264Presets)]
-        public string OutputPreset { get; set; } = "slow";
-        public int OutputBitrateMegabytes { get; set; } = 5;
-
-        public bool LogFFmpegOutput { get; set; }
-        public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
-
-        [YamlIgnore]
-        public string VideoCodec => "h264_" + HardwareAcceleration.GetH264Suffix();
-
-        public void Save(string path) => File.WriteAllText(path, Serializer.Serialize(this));
-
-        public static RecorderOptions Load(string path, out bool exists)
-        {
-            RecorderOptions opt;
-
-            if (!File.Exists(path))
-            {
-                opt = new RecorderOptions();
-                exists = false;
-            }
-            else
-            {
-                opt = Deserializer.Deserialize<RecorderOptions>(File.ReadAllText(path));
-                exists = true;
-            }
-
-            if (opt.OutputQuality < 0 || opt.OutputQuality > 100)
-                opt.OutputQuality = 50;
-
-            if (!H264Presets.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries).Contains(opt.OutputPreset))
-                opt.OutputPreset = "slow";
-
-            opt.Save(path);
-
-            return opt;
-        }
-    }
-
-    public class Recorder
-    {
-        private class Fragment
-        {
-            public DateTimeOffset Time { get; }
-            public Mp4Box[] Boxes { get; }
-
-            public Fragment(DateTimeOffset time, Mp4Box[] boxes)
-            {
-                this.Time = time;
-                this.Boxes = boxes;
-            }
-        }
-
         private class RecState
         {
             public int AudioTrackID, VideoTrackID;
@@ -126,14 +36,14 @@ namespace SharpReplay
         private int FragmentCounter;
         private readonly Timer FragmentTimer;
 
-        public Recorder()
+        public FFmpegRecorder()
         {
             this.FragmentTimer = new Timer(5000);
             this.FragmentTimer.Elapsed += this.FragmentTimer_Elapsed;
             this.FragmentTimer.Start();
         }
 
-        public Recorder(RecorderOptions options) : this()
+        public FFmpegRecorder(RecorderOptions options) : this()
         {
             this.Options = options;
         }
@@ -226,90 +136,6 @@ namespace SharpReplay
             return Options.Framerate;
         }
 
-        public async Task<string> WriteReplayAsync()
-        {
-            string outPath = $"./out/{DateTime.Now:yyyyMMdd_hhmmss}.mp4";
-
-            LogTo.Info("Writing replay to \"{0}\"", outPath);
-
-            Directory.CreateDirectory(Path.GetDirectoryName(outPath));
-
-            var pipe = new NamedPipeServerStream("outpipe", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 448 * 1024);
-
-            var curator = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "ffmpeg.exe",
-                    Arguments = $@"-r {Options.Framerate} -i \\.\pipe\outpipe -c:v {Options.VideoCodec} -crf {(int)(51 - (Options.OutputQuality / 100 * 51))} -preset {Options.OutputPreset} -b:a 128k -b:v {Options.OutputBitrateMegabytes}M {outPath}",
-                    UseShellExecute = false,
-                    RedirectStandardInput = true,
-                    CreateNoWindow = true
-                }
-            };
-            curator.Exited += (_, __) => LogTo.Debug("Curator FFmpeg exited");
-
-            LogTo.Debug("Launching FFmpeg with arguments:");
-            LogTo.Debug(curator.StartInfo.Arguments);
-
-            curator.Start();
-
-            await pipe.WaitForConnectionAsync();
-            await WriteReplayAsync(pipe, false);
-
-            curator.StandardInput.Write("qqqqqqqqqqqqqqq");
-
-            if (!await curator.WaitForExitAsync(3000))
-                curator.Kill();
-
-            pipe.Dispose();
-
-            LogTo.Info("Done writing");
-            await StartAsync();
-
-            return Path.GetFullPath(outPath);
-        }
-
-        public async Task WriteReplayAsync(Stream toStream, bool closeStream = true)
-        {
-            if (!IsRecording)
-                throw new InvalidOperationException("Not recording");
-
-            LogTo.Info("Writing replay");
-
-            LogTo.Debug("Waiting for one more fragment");
-            FragmentEvent.Reset();
-            await FragmentEvent.WaitAsync();
-
-            LogTo.Debug("Current time: {0}", DateTimeOffset.Now.ToUnixTimeMilliseconds());
-            LogTo.Debug("Last fragment time: {0}", Fragments.Last.Time.ToUnixTimeMilliseconds());
-
-            LogTo.Debug("Waiting for FFmpeg to exit");
-
-            await StopAsync();
-
-            LogTo.Debug("Writing fragments");
-
-            await toStream.WriteAsync(Mp4Header, 0, Mp4Header.Length);
-
-            var frags = Fragments.Where(o => (Fragments.Last.Time - o.Time).TotalSeconds < Options.MaxReplayLengthSeconds);
-            int count = 0;
-            foreach (var item in frags)
-            {
-                foreach (var box in item.Boxes)
-                {
-                    await toStream.WriteAsync(box.Data, 0, box.Data.Length);
-                }
-
-                count++;
-            }
-
-            if (closeStream)
-                toStream.Dispose();
-
-            LogTo.Info("Written {0} fragments", count);
-        }
-
         public async Task StopAsync()
         {
             LogTo.Info("Stopping");
@@ -327,6 +153,34 @@ namespace SharpReplay
             FFPipe.Dispose();
 
             GC.Collect();
+        }
+
+        public async Task WriteDataAsync(Stream output)
+        {
+            LogTo.Info("Writing replay");
+
+            var lastFrag = Fragments.Last();
+
+            LogTo.Debug("Current time: {0}", DateTimeOffset.Now.ToUnixTimeMilliseconds());
+            LogTo.Debug("Last fragment time: {0}", lastFrag.Time.ToUnixTimeMilliseconds());
+
+            LogTo.Debug("Writing fragments");
+
+            await output.WriteAsync(Mp4Header, 0, Mp4Header.Length);
+
+            var frags = Fragments.Where(o => (lastFrag.Time - o.Time).TotalSeconds < Options.MaxReplayLengthSeconds);
+            int count = 0;
+            foreach (var item in frags)
+            {
+                foreach (var box in item.Boxes)
+                {
+                    await output.WriteAsync(box.Data, 0, box.Data.Length);
+                }
+
+                count++;
+            }
+
+            LogTo.Info("Written {0} fragments", count);
         }
 
         private void FragmentTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)

@@ -1,5 +1,7 @@
 ﻿using MahApps.Metro.Controls;
 using NHotkey.Wpf;
+using SharpReplay.Models;
+using SharpReplay.Recorders;
 using SharpReplay.UI;
 using System;
 using System.ComponentModel;
@@ -17,7 +19,7 @@ namespace SharpReplay
         private const string ConfigFile = "./config.yml";
 
         public RecorderOptions Options { get; set; }
-        private Recorder Recorder;
+        private IRecorder Recorder;
 
 #pragma warning disable CS0067
         public event PropertyChangedEventHandler PropertyChanged;
@@ -71,7 +73,7 @@ namespace SharpReplay
 
             SaveOptions();
 
-            Recorder = new Recorder(Options);
+            Recorder = new FFmpegRecorder(Options);
             await Recorder.StartAsync();
         }
 
@@ -87,7 +89,12 @@ namespace SharpReplay
             var window = new SavingReplayWindow();
             window.Show();
 
-            window.ReplayPath = await Recorder.WriteReplayAsync();
+            var curator = new Curator(Options, Recorder);
+            string outPath = $"./out/{DateTime.Now:yyyyMMdd_hhmmss}.mp4";
+
+            await curator.WriteReplayAsync(outPath);
+
+            window.ReplayPath = outPath;
             window.IsSaved = true;
 
             await Task.Delay(2000);

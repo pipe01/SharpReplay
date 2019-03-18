@@ -85,9 +85,14 @@
     <ApplicationDefinition Include="App.xaml">
       <Generator>MSBuild:Compile</Generator>
     </ApplicationDefinition>
+    <Compile Include="Curator.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="BoxParser.cs" />
-    <Compile Include="Recorder.cs" />
+    <Compile Include="Models\Fragment.cs" />
+    <Compile Include="Models\RecorderOptions.cs" />
+    <Compile Include="Recorders\FFmpegRecorder.cs" />
+    <Compile Include="Recorders\IRecorder.cs" />
+    <Compile Include="Recorders\IVideoProvider.cs" />
     <Compile Include="UI\Hotkey.cs" />
     <Compile Include="UI\HotkeyEditorControl.xaml.cs">
       <DependentUpon>HotkeyEditorControl.xaml</DependentUpon>

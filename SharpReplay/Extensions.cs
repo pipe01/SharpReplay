@@ -1,5 +1,6 @@
 ﻿using NHotkey;
 using NHotkey.Wpf;
+using SharpReplay.Models;
 using SharpReplay.UI;
 using System;
 using System.Diagnostics;

@@ -1,0 +1,15 @@
+﻿using SharpReplay.Models;
+using System.IO;
+using System.Threading.Tasks;
+
+namespace SharpReplay.Recorders
+{
+    public interface IRecorder : IVideoProvider
+    {
+        RecorderOptions Options { get; set; }
+        bool IsRecording { get; }
+
+        Task StartAsync();
+        Task StopAsync();
+    }
+}
