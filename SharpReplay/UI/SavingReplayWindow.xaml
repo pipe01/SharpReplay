@@ -42,25 +42,27 @@
         </EventTrigger>
     </Window.Triggers>
 
-    <Grid Margin="10">
-        <TextBlock Visibility="{Binding IsNotSaved, Converter={StaticResource BoolToVisibilityConverter}}"
+    <Border BorderThickness="1 1 0 1" BorderBrush="Black">
+        <Grid Margin="9">
+            <TextBlock Visibility="{Binding IsNotSaved, Converter={StaticResource BoolToVisibilityConverter}}"
                    FontFamily="Segoe UI Light" FontSize="30">
             Saving replay...
-        </TextBlock>
-
-        <Grid Visibility="{Binding IsSaved, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            
-            <TextBlock Grid.Column="0" FontFamily="Segoe UI Light" FontSize="30">
-                Saved
             </TextBlock>
 
-            <Button Grid.Column="1" Margin="10 0 10 0" FontFamily="Segoe UI" FontSize="14" Click="Open_Click">
-                Open
-            </Button>
+            <Grid Visibility="{Binding IsSaved, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" FontFamily="Segoe UI Light" FontSize="30">
+                    Saved
+                </TextBlock>
+
+                <Button Grid.Column="1" Margin="20 0 10 0" FontFamily="Segoe UI" FontSize="14" Click="Open_Click">
+                    Open
+                </Button>
+            </Grid>
         </Grid>
-    </Grid>
+    </Border>
 </Window>
