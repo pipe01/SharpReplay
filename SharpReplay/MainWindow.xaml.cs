@@ -5,6 +5,7 @@ using SharpReplay.Recorders;
 using SharpReplay.UI;
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -94,7 +95,7 @@ namespace SharpReplay
 
             await curator.WriteReplayAsync(outPath);
 
-            window.ReplayPath = outPath;
+            window.ReplayPath = Path.GetFullPath(outPath);
             window.IsSaved = true;
 
             await Task.Delay(2000);

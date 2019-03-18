@@ -63,6 +63,9 @@ namespace SharpReplay
             {
                 int read = BaseStream.Read(lengthB, 0, 4);
 
+                if (read == 0)
+                    continue;
+
                 int length = lengthB.ToInt32BigEndian();
 
                 if (length == 0)
@@ -76,17 +79,8 @@ namespace SharpReplay
                 Buffer.BlockCopy(lengthB, 0, data, 0, 4);
                 Buffer.BlockCopy(nameB, 0, data, 4, 4);
 
-                try
-                {
-                    BaseStream.ReadCompletely(data, 8, length - 8);
-                }
-                catch (Exception ex)
-                {
-                    if (!(ex is ObjectDisposedException))
-                        LogTo.FatalException("Recording error", ex);
+                BaseStream.ReadCompletely(data, 8, length - 8);
 
-                    yield break;
-                }
 
                 yield return new Mp4Box(name, data);
             }
