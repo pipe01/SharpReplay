@@ -64,8 +64,8 @@ namespace SharpReplay
             => man.AddOrReplace(name, hotkey.Key, hotkey.Modifiers, handler);
 
         public static string GetH264Suffix(this RecorderOptions.HardwareAccel accel)
-            => accel == RecorderOptions.HardwareAccel.AMD ? "amf" :
-               accel == RecorderOptions.HardwareAccel.NVIDIA ? "nvenc" : null;
+            => accel == RecorderOptions.HardwareAccel.AMD ? "_amf" :
+               accel == RecorderOptions.HardwareAccel.NVIDIA ? "_nvenc" : null;
 
         public static int ToInt32BigEndian(this byte[] data, int offset = 0)
             => data[offset + 3] | data[offset + 2] << 8 | data[offset + 1] << 16 | data[offset] << 24;

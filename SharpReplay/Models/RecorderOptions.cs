@@ -49,7 +49,7 @@ namespace SharpReplay.Models
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);
 
         [YamlIgnore]
-        public string VideoCodec => "h264_" + HardwareAcceleration.GetH264Suffix();
+        public string VideoCodec => "h264" + HardwareAcceleration.GetH264Suffix();
 
         public void Save(string path) => File.WriteAllText(path, Serializer.Serialize(this));
 

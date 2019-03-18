@@ -71,7 +71,7 @@ namespace SharpReplay
 
         public static async Task<bool> IsAcceleratorAvailable(RecorderOptions.HardwareAccel accel)
         {
-            string codec = "h264_" + accel.GetH264Suffix();
+            string codec = "h264" + accel.GetH264Suffix();
 
             var ffmpeg = new Process
             {
