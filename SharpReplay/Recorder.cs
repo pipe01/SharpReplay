@@ -175,23 +175,23 @@ namespace SharpReplay
 
             string audioArgs = Options.AudioDevices.Length == 0 ? "" :
                 string.Join(" ", Options.AudioDevices?.Select(o => $@"-f dshow -i audio=""{o}""")) +
-                $@" -filter_complex ""{string.Concat(Options.AudioDevices.Select((_, i) => $"[{i + 1}:0]volume = 1[a{i}];"))}{string.Concat(Options.AudioDevices.Select((_, i) => $"[a{i}]"))}amix=inputs={Options.AudioDevices.Length}[a]"" -map 0:v -map ""[a]"" ";
+                $@" -filter_complex ""{string.Concat(Options.AudioDevices.Select((_, i) => $"[{i + 1}:0]volume = 1[a{i}];"))}{string.Concat(Options.AudioDevices.Select((_, i) => $"[a{i}]"))}amix=inputs={Options.AudioDevices.Length}[a]"" -map ""[a]"" ";
 
             FFmpeg = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $"-f gdigrab -framerate {Options.Framerate} -r {Options.Framerate} -i desktop " +
-                            audioArgs +
-                            $"-b:a 128k -g {DetermineGOP()} -strict experimental -c:v {Options.VideoCodec} {(Options.LosslessInMemory ? "-crf 0 -preset ultrafast" : "")} -b:v 5M " +
-                           $@"-r {Options.Framerate} -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
+                    Arguments = $"-framerate {Options.Framerate} -f gdigrab -i desktop " + audioArgs +
+                            $"-b:a 128k -g {DetermineGOP()} -c:v {Options.VideoCodec} {(Options.LosslessInMemory ? "-crf 0 -preset ultrafast" : "")} -b:v 5M " +
+                           $@"-r {Options.Framerate} -map 0:v -probesize 10M -f ismv -movflags frag_keyframe -y \\.\pipe\ffpipe",
                     RedirectStandardInput = true,
                     RedirectStandardError = Options.LogFFmpegOutput,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 }
             };
+            FFmpeg.Exited += (_, __) => LogTo.Debug("FFmpeg exited");
 
             LogTo.Debug("Launching FFmpeg with arguments:");
             LogTo.Debug(FFmpeg.StartInfo.Arguments);
@@ -241,12 +241,13 @@ namespace SharpReplay
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $@"-i \\.\pipe\outpipe -c:v {Options.VideoCodec} -crf {(int)(51 - (Options.OutputQuality * 51))} -preset {Options.OutputPreset} -b:a 128k -b:v {Options.OutputBitrateMegabytes}M {outPath}",
+                    Arguments = $@"-r {Options.Framerate} -i \\.\pipe\outpipe -c:v {Options.VideoCodec} -crf {(int)(51 - (Options.OutputQuality / 100 * 51))} -preset {Options.OutputPreset} -b:a 128k -b:v {Options.OutputBitrateMegabytes}M {outPath}",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     CreateNoWindow = true
                 }
             };
+            curator.Exited += (_, __) => LogTo.Debug("Curator FFmpeg exited");
 
             LogTo.Debug("Launching FFmpeg with arguments:");
             LogTo.Debug(curator.StartInfo.Arguments);
@@ -257,7 +258,9 @@ namespace SharpReplay
             await WriteReplayAsync(pipe, false);
 
             curator.StandardInput.Write("qqqqqqqqqqqqqqq");
-            await curator.WaitForExitAsync();
+
+            if (!await curator.WaitForExitAsync(3000))
+                curator.Kill();
 
             pipe.Dispose();
 
@@ -281,9 +284,13 @@ namespace SharpReplay
             LogTo.Debug("Current time: {0}", DateTimeOffset.Now.ToUnixTimeMilliseconds());
             LogTo.Debug("Last fragment time: {0}", Fragments.Last.Time.ToUnixTimeMilliseconds());
 
-            await toStream.WriteAsync(Mp4Header, 0, Mp4Header.Length);
+            LogTo.Debug("Waiting for FFmpeg to exit");
 
             await StopAsync();
+
+            LogTo.Debug("Writing fragments");
+
+            await toStream.WriteAsync(Mp4Header, 0, Mp4Header.Length);
 
             var frags = Fragments.Where(o => (Fragments.Last.Time - o.Time).TotalSeconds < Options.MaxReplayLengthSeconds);
             int count = 0;
@@ -309,19 +316,10 @@ namespace SharpReplay
 
             FFmpeg.StandardInput.Write("qqqqqqqqqqqq");
 
-            var cts = new CancellationTokenSource(3000);
-
-            try
-            {
-                await FFmpeg.WaitForExitAsync(cts.Token);
-            }
-            catch (TaskCanceledException)
-            {
+            if (!await FFmpeg.WaitForExitAsync(3000))
                 FFmpeg.Kill();
-            }
-            cts.Dispose();
 
-            await Task.Delay(1000);
+            await Task.Delay(300);
 
             IsRecording = false;
 
@@ -377,8 +375,8 @@ namespace SharpReplay
 
             foreach (var box in boxes)
             {
-                if (Options.LogFFmpegOutput)
-                    LogTo.Debug("Box: " + box.Name);
+                //if (Options.LogFFmpegOutput)
+                //    LogTo.Debug("Box: " + box.Name);
 
                 if (box.Name == "moof" || box.Name == "mdat")
                 {

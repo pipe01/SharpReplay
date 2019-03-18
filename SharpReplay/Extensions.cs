@@ -25,6 +25,23 @@ namespace SharpReplay
             }
         }
 
+        public static async Task<bool> WaitForExitAsync(this Process process, int timeoutDelay)
+        {
+            var cts = new CancellationTokenSource(timeoutDelay);
+
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                return false;
+            }
+
+            cts.Dispose();
+            return true;
+        }
+
         public static Task WaitForExitAsync(this Process process, CancellationToken cancellationToken = default)
         {
             if (process.HasExited)
