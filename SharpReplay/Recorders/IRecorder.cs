@@ -10,6 +10,6 @@ namespace SharpReplay.Recorders
         bool IsRecording { get; }
 
         Task StartAsync();
-        Task StopAsync();
+        Task StopAsync(bool discard = false);
     }
 }

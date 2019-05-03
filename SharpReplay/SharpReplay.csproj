@@ -93,8 +93,6 @@
     <Compile Include="Recorders\FFmpegRecorder.cs" />
     <Compile Include="Recorders\IRecorder.cs" />
     <Compile Include="Recorders\IVideoProvider.cs" />
-    <Compile Include="Recorders\LibRecorder.cs" />
-    <Compile Include="Recorders\MP4Recorder.cs" />
     <Compile Include="UI\Hotkey.cs" />
     <Compile Include="UI\HotkeyEditorControl.xaml.cs">
       <DependentUpon>HotkeyEditorControl.xaml</DependentUpon>

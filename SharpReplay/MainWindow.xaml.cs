@@ -93,7 +93,17 @@ namespace SharpReplay
             var curator = new Curator(Options, Recorder);
             string outPath = $"./out/{DateTime.Now:yyyyMMdd_hhmmss}.mp4";
 
-            await curator.WriteReplayAsync(outPath);
+            if (Recorder.IsCurationNeeded)
+            {
+                await curator.WriteReplayAsync(outPath);
+            }
+            else
+            {
+                using (var file = File.OpenWrite(outPath))
+                {
+                    await Recorder.WriteDataAsync(file);
+                }
+            }
 
             window.ReplayPath = Path.GetFullPath(outPath);
             window.IsSaved = true;
