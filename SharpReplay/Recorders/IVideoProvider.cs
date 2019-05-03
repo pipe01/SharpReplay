@@ -3,10 +3,15 @@ using System.Threading.Tasks;
 
 namespace SharpReplay.Recorders
 {
-    public interface IVideoProvider
+    public interface IStreamVideoProvider
     {
         bool IsCurationNeeded { get; }
 
-        Task WriteDataAsync(Stream output);
+        Task WriteDataAsync(Stream stream);
+    }
+
+    public interface IFileVideoProvider
+    {
+        Task WriteDataAsync(string fileName);
     }
 }

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace SharpReplay.Recorders
 {
-    public interface IRecorder : IVideoProvider
+    public interface IRecorder
     {
         RecorderOptions Options { get; set; }
         bool IsRecording { get; }

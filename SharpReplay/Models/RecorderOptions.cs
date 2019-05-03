@@ -44,6 +44,7 @@ namespace SharpReplay.Models
         [Description("H.264 preset. From worst to best quality: " + H264Presets)]
         public string OutputPreset { get; set; } = "slow";
         public int OutputBitrateMegabytes { get; set; } = 5;
+        public int MemoryBitrateMegabytes { get; set; } = 5;
 
         public bool LogFFmpegOutput { get; set; }
         public Hotkey SaveReplayHotkey { get; set; } = new Hotkey(Key.P, ModifierKeys.Control | ModifierKeys.Alt);

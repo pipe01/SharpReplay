@@ -14,9 +14,9 @@ namespace SharpReplay
     public class Curator
     {
         private readonly RecorderOptions Options;
-        private readonly IVideoProvider VideoProvider;
+        private readonly IStreamVideoProvider VideoProvider;
 
-        public Curator(RecorderOptions options, IVideoProvider videoProvider)
+        public Curator(RecorderOptions options, IStreamVideoProvider videoProvider)
         {
             this.Options = options;
             this.VideoProvider = videoProvider;

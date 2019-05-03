@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace SharpReplay.Recorders
 {
-    public class FFmpegRecorder : IRecorder
+    public class FFmpegRecorder : IRecorder, IFileVideoProvider
     {
         private const int SegmentInterval = 3;
 
@@ -21,7 +21,7 @@ namespace SharpReplay.Recorders
         public bool IsRecording { get; private set; }
 
         private Process FFmpeg;
-        private IDictionary<int, (NamedPipeServerStream Pipe, MemoryStream Stream)> Pipes;
+        private ContinuousList<(NamedPipeServerStream Pipe, MemoryStream Stream, int Index)> Pipes;
         private readonly AsyncAutoResetEvent SegmentEvent = new AsyncAutoResetEvent();
 
         private int PipeNumber => (int)Math.Ceiling((float)Options.MaxReplayLengthSeconds / SegmentInterval) + 1;
@@ -33,7 +33,16 @@ namespace SharpReplay.Recorders
 
         public Task StartAsync()
         {
-            Pipes = new Dictionary<int, (NamedPipeServerStream, MemoryStream)>();
+            Pipes = new ContinuousList<(NamedPipeServerStream, MemoryStream, int)>(PipeNumber);
+            Pipes.ItemDropped += (sender, e) =>
+            {
+                try
+                {
+                    e.Pipe.Dispose();
+                    e.Stream.Dispose();
+                }
+                catch { }
+            };
 
             for (int i = 0; i < PipeNumber; i++)
             {
@@ -45,7 +54,7 @@ namespace SharpReplay.Recorders
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $"-f gdigrab -i desktop -r {Options.Framerate} -c:v {Options.VideoCodec} -b:v 5M " +
+                    Arguments = $"-f gdigrab -i desktop -r {Options.Framerate} -c:v {Options.VideoCodec} -b:v {Options.MemoryBitrateMegabytes}M " +
                             $"-g {SegmentInterval * Options.Framerate} -flags -global_header -map 0 -crf 0 " +
                             $"-preset ultrafast -f segment -segment_time {SegmentInterval} -segment_format ismv " +
                             $@"-y \\.\pipe\ffpipe%d",
@@ -65,7 +74,7 @@ namespace SharpReplay.Recorders
         private void AddPipe(int index = -1)
         {
             if (index == -1)
-                index = Pipes.Keys.Last() + 1;
+                index = Pipes.Last().Index + 1;
 
             var pipe = new NamedPipeServerStream("ffpipe" + index, PipeDirection.In, PipeNumber, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 448 * 1024, 0);
             var mem = new MemoryStream();
@@ -84,19 +93,15 @@ namespace SharpReplay.Recorders
                 }
 
                 LogTo.Debug("Writing to pipe index {0}", pipeIndex);
-                LogTo.Debug("Pipes: " + string.Join(", ", Pipes.Keys));
+                LogTo.Debug("Pipes: " + string.Join(", ", Pipes.Select(j => j.Index)));
 
-                if (pipeIndex == Pipes.Keys.Min() + PipeNumber - 1)
+                if (pipeIndex == Pipes.First().Index + PipeNumber - 1)
                 {
                     LogTo.Debug("Pruning pipes and adding a new one");
 
-                    var oldIndex = Pipes.Keys.Min();
-                    Pipes[oldIndex].Stream.Dispose();
-                    Pipes.Remove(oldIndex);
-
                     AddPipe(pipeIndex + 1);
 
-                    LogTo.Debug("Pipes: " + string.Join(", ", Pipes.Keys));
+                    LogTo.Debug("Pipes: " + string.Join(", ", Pipes.Select(j => j.Index)));
                 }
 
                 int read = 0;
@@ -127,7 +132,7 @@ namespace SharpReplay.Recorders
                 IsBackground = true
             }.Start(index);
 
-            Pipes.Add(index, (pipe, mem));
+            Pipes.Add((pipe, mem, index));
         }
 
         public async Task StopAsync(bool discard = false)
@@ -145,10 +150,10 @@ namespace SharpReplay.Recorders
 
             foreach (var pipe in Pipes)
             {
-                pipe.Value.Pipe.Dispose();
+                pipe.Pipe.Dispose();
 
                 if (discard)
-                    pipe.Value.Stream.Dispose();
+                    pipe.Stream.Dispose();
             }
 
             if (discard)
@@ -157,9 +162,9 @@ namespace SharpReplay.Recorders
             GC.Collect();
         }
 
-        public async Task WriteDataAsync(Stream output)
+        public async Task WriteDataAsync(string fileName)
         {
-            await SegmentEvent.WaitAsync();
+            await StopAsync();
 
             string tempFolder = "./temp";
 
@@ -172,18 +177,18 @@ namespace SharpReplay.Recorders
 
             var files = new List<string>();
 
-            LogTo.Debug("Stream lengths: " + string.Join(", ", Pipes.Select(o => o.Value.Stream.Length)));
+            LogTo.Debug("Stream lengths: " + string.Join(", ", Pipes.Select(o => o.Stream.Length)));
 
-            foreach (var item in Pipes.Where(o => o.Key < Pipes.Keys.Max())) //Get all segments except the last one
+            foreach (var item in Pipes)
             {
                 var path = Path.Combine(tempFolder, $"segment{files.Count}.mp4");
                 files.Add(path);
 
                 using (var file = File.OpenWrite(path))
                 {
-                    item.Value.Stream.Position = 0;
+                    item.Stream.Position = 0;
 
-                    await item.Value.Stream.CopyToAsync(file);
+                    await item.Stream.CopyToAsync(file);
                     file.Flush();
                 }
             }
@@ -193,7 +198,7 @@ namespace SharpReplay.Recorders
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $@"-i ""concat:{string.Join("|", files)}"" -c copy output.mp4",
+                    Arguments = $@"-i ""concat:{string.Join("|", files)}"" -b:v {Options.OutputBitrateMegabytes}M -c:v {Options.VideoCodec} -y ""{fileName}""",
                     RedirectStandardError = false,
                     UseShellExecute = false,
                     CreateNoWindow = true
@@ -202,6 +207,8 @@ namespace SharpReplay.Recorders
             ffmpeg.Start();
 
             await ffmpeg.WaitForExitAsync();
+
+            await StartAsync();
         }
     }
 }

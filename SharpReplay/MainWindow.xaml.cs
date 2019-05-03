@@ -90,19 +90,27 @@ namespace SharpReplay
             var window = new SavingReplayWindow();
             window.Show();
 
-            var curator = new Curator(Options, Recorder);
             string outPath = $"./out/{DateTime.Now:yyyyMMdd_hhmmss}.mp4";
 
-            if (Recorder.IsCurationNeeded)
+            if (Recorder is IStreamVideoProvider streamVideo)
             {
-                await curator.WriteReplayAsync(outPath);
-            }
-            else
-            {
-                using (var file = File.OpenWrite(outPath))
+                var curator = new Curator(Options, streamVideo);
+
+                if (streamVideo.IsCurationNeeded)
                 {
-                    await Recorder.WriteDataAsync(file);
+                    await curator.WriteReplayAsync(outPath);
                 }
+                else
+                {
+                    using (var file = File.OpenWrite(outPath))
+                    {
+                        await streamVideo.WriteDataAsync(file);
+                    }
+                }
+            }
+            else if (Recorder is IFileVideoProvider fileVideo)
+            {
+                await fileVideo.WriteDataAsync(outPath);
             }
 
             window.ReplayPath = Path.GetFullPath(outPath);
