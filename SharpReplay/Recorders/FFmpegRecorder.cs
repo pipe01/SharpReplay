@@ -24,7 +24,7 @@ namespace SharpReplay.Recorders
         private ContinuousList<(NamedPipeServerStream Pipe, MemoryStream Stream, int Index)> Pipes;
         private readonly AsyncAutoResetEvent SegmentEvent = new AsyncAutoResetEvent();
 
-        private int PipeNumber => (int)Math.Ceiling((float)Options.MaxReplayLengthSeconds / SegmentInterval) + 1;
+        private int PipeNumber => (int)Math.Ceiling((float)Options.MaxReplayLengthSeconds / SegmentInterval) + 2;
 
         public FFmpegRecorder(RecorderOptions options)
         {
@@ -59,13 +59,30 @@ namespace SharpReplay.Recorders
                             $"-preset ultrafast -f segment -segment_time {SegmentInterval} -segment_format ismv " +
                             $@"-y \\.\pipe\ffpipe%d",
                     RedirectStandardInput = true,
-                    RedirectStandardError = false,
+                    RedirectStandardError = Options.LogFFmpegOutput,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 }
             };
             FFmpeg.Exited += delegate { IsRecording = false; };
             FFmpeg.Start();
+
+            if (Options.LogFFmpegOutput)
+            {
+                new Thread(() =>
+                {
+                    while (!FFmpeg.HasExited)
+                    {
+                        var line = FFmpeg.StandardError.ReadLine();
+
+                        if (line != null)
+                            LogTo.Debug($"[FFMPEG] {line}");
+                    }
+                })
+                {
+                    IsBackground = true
+                }.Start();
+            }
 
             IsRecording = true;
             return Task.CompletedTask;
@@ -170,10 +187,7 @@ namespace SharpReplay.Recorders
 
             Directory.CreateDirectory(tempFolder);
 
-            foreach (var item in Directory.EnumerateFiles(tempFolder))
-            {
-                File.Delete(item);
-            }
+            ClearFolder();
 
             var files = new List<string>();
 
@@ -198,7 +212,7 @@ namespace SharpReplay.Recorders
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $@"-i ""concat:{string.Join("|", files)}"" -b:v {Options.OutputBitrateMegabytes}M -c:v {Options.VideoCodec} -y ""{fileName}""",
+                    Arguments = $@"-i ""concat:{string.Join("|", files)}"" -t {Options.MaxReplayLengthSeconds} -b:v {Options.OutputBitrateMegabytes}M -c:v {Options.VideoCodec} -y ""{fileName}""",
                     RedirectStandardError = false,
                     UseShellExecute = false,
                     CreateNoWindow = true
@@ -208,7 +222,17 @@ namespace SharpReplay.Recorders
 
             await ffmpeg.WaitForExitAsync();
 
+            ClearFolder();
+
             await StartAsync();
+
+            void ClearFolder()
+            {
+                foreach (var item in Directory.EnumerateFiles(tempFolder))
+                {
+                    File.Delete(item);
+                }
+            }
         }
     }
 }
