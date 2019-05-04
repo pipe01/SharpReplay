@@ -36,6 +36,8 @@ namespace SharpReplay.Recorders
             Pipes = new ContinuousList<(NamedPipeServerStream, MemoryStream, int)>(PipeNumber);
             Pipes.ItemDropped += (sender, e) =>
             {
+                LogTo.Debug("Dropping pipe {0}", e.Index);
+
                 try
                 {
                     e.Pipe.Dispose();
@@ -54,7 +56,8 @@ namespace SharpReplay.Recorders
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $"-f gdigrab -i desktop -r {Options.Framerate} -c:v {Options.VideoCodec} -b:v {Options.MemoryBitrateMegabytes}M " +
+                    Arguments = $"{(Options.UseDShowCapture ? @"-f dshow -i video=""screen-capture-recorder""" : "-f gdigrab")} " +
+                            $"-r {Options.Framerate} -c:v {Options.VideoCodec} -b:v {Options.MemoryBitrateMegabytes}M " +
                             $"-g {SegmentInterval * Options.Framerate} -flags -global_header -map 0 -crf 0 " +
                             $"-preset ultrafast -f segment -segment_time {SegmentInterval} -segment_format ismv " +
                             $@"-y \\.\pipe\ffpipe%d",
@@ -212,7 +215,7 @@ namespace SharpReplay.Recorders
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $@"-i ""concat:{string.Join("|", files)}"" -t {Options.MaxReplayLengthSeconds} -b:v {Options.OutputBitrateMegabytes}M -c:v {Options.VideoCodec} -y ""{fileName}""",
+                    Arguments = $@"-i ""concat:{string.Join("|", files)}"" -t {Options.MaxReplayLengthSeconds} -b:v {Options.OutputBitrateMegabytes}M -c:v {(Options.EncodeOutput ? Options.VideoCodec : "copy")} -y ""{fileName}""",
                     RedirectStandardError = false,
                     UseShellExecute = false,
                     CreateNoWindow = true

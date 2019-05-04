@@ -38,9 +38,15 @@ namespace SharpReplay.Models
         public HardwareAccel HardwareAcceleration { get; set; }
         [Description("If disabled this compresses captured video on memory, trading reduced memory usage for more CPU usage")]
         public bool LosslessInMemory { get; set; } = true;
+        [Description("Requires https://github.com/rdp/screen-capture-recorder-to-video-windows-free")]
+        public bool UseDShowCapture { get; set; }
+
+        [Description("If true the output will be smaller but will use more CPU")]
+        public bool EncodeOutput { get; set; } = false;
 
         [Description("100 means lossless image, 0 means there's barely any video")]
         public double OutputQuality { get; set; } = 50;
+
         [Description("H.264 preset. From worst to best quality: " + H264Presets)]
         public string OutputPreset { get; set; } = "slow";
         public int OutputBitrateMegabytes { get; set; } = 5;
