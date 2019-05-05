@@ -25,6 +25,7 @@ namespace SharpReplay.Recorders
         private bool StopRequested;
 
         public event StoppedDelegate Stopped;
+        public event StartedDelegate Started;
 
         private int PipeNumber => (int)Math.Ceiling((float)Options.MaxReplayLengthSeconds / SegmentInterval) + 2;
 
@@ -96,6 +97,8 @@ namespace SharpReplay.Recorders
             }
 
             IsRecording = true;
+            Started?.Invoke();
+
             return Task.CompletedTask;
         }
 

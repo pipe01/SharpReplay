@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 
 namespace SharpReplay
 {
@@ -21,6 +22,9 @@ namespace SharpReplay
         private const string ConfigFile = "./config.yml";
 
         public RecorderOptions Options { get; set; }
+        public string Status { get; set; } = "starting up";
+        public Brush StatusColor { get; set; } = new SolidColorBrush(Colors.Orange);
+
         private IRecorder Recorder;
 
 #pragma warning disable CS0067
@@ -77,12 +81,29 @@ namespace SharpReplay
 
             Recorder = new FFmpegRecorder(Options);
             Recorder.Stopped += this.Recorder_Stopped;
+            Recorder.Started += this.Recorder_Started;
 
             await Recorder.StartAsync();
         }
 
+        private void SetStatus(string text, Color color)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                this.Status = text;
+                this.StatusColor = new SolidColorBrush(color);
+            });
+        }
+
+        private void Recorder_Started()
+        {
+            SetStatus("recording", Colors.Green);
+        }
+
         private async void Recorder_Stopped(bool requested)
         {
+            SetStatus("stopped", Colors.Red);
+
             if (!requested)
             {
                 LogTo.Error("Recorder unexpectedly stopped, restarting in 1 second");
@@ -94,6 +115,8 @@ namespace SharpReplay
 
         private async void Restart_Click(object sender, RoutedEventArgs e)
         {
+            SetStatus("restarting", Colors.Orange);
+
             await Recorder.StopAsync();
             await Task.Delay(200);
             await Recorder.StartAsync();

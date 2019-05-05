@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 namespace SharpReplay.Recorders
 {
     public delegate void StoppedDelegate(bool requested);
+    public delegate void StartedDelegate();
 
     public interface IRecorder
     {
@@ -12,6 +13,7 @@ namespace SharpReplay.Recorders
         bool IsRecording { get; }
 
         event StoppedDelegate Stopped;
+        event StartedDelegate Started;
 
         Task StartAsync();
         Task StopAsync(bool discard = false);
