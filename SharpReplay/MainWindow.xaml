@@ -8,7 +8,7 @@
         xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d" Initialized="Window_Initialized" Closing="Window_Closing" Icon="Images/icon.ico"
-        Title="SharpReplay" Height="232" Width="234" ResizeMode="CanMinimize" ShowIconOnTitleBar="False"
+        Title="SharpReplay" Height="254" Width="234" ResizeMode="CanMinimize" ShowIconOnTitleBar="False"
         StateChanged="MetroWindow_StateChanged" WindowStartupLocation="CenterScreen" Closed="MetroWindow_Closed">
 
     <StackPanel VerticalAlignment="Center">
@@ -42,6 +42,11 @@
                 </ListBox.ItemTemplate>
             </ListView>
         </StackPanel>
+
+        <DockPanel LastChildFill="True" Margin="10 5 10 0">
+            <TextBlock DockPanel.Dock="Left" Text="Replay duration:" />
+            <Controls:NumericUpDown Margin="5 0 0 0" Value="{Binding Options.MaxReplayLengthSeconds}" Interval="5" Minimum="5"  Maximum="60" />
+        </DockPanel>
 
         <Button x:Name="Restart" Width="100" Height="40" Margin="0 10 0 0" Click="Restart_Click">Apply changes</Button>
     </StackPanel>

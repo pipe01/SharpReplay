@@ -16,13 +16,15 @@ namespace SharpReplay.Recorders
     {
         private const int SegmentInterval = 3;
 
-        public bool IsCurationNeeded => false;
         public RecorderOptions Options { get; set; }
         public bool IsRecording { get; private set; }
 
         private Process FFmpeg;
         private ContinuousList<(NamedPipeServerStream Pipe, MemoryStream Stream, int Index)> Pipes;
         private readonly AsyncAutoResetEvent SegmentEvent = new AsyncAutoResetEvent();
+        private bool StopRequested;
+
+        public event StoppedDelegate Stopped;
 
         private int PipeNumber => (int)Math.Ceiling((float)Options.MaxReplayLengthSeconds / SegmentInterval) + 2;
 
@@ -56,7 +58,7 @@ namespace SharpReplay.Recorders
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "ffmpeg.exe",
-                    Arguments = $"{(Options.UseDShowCapture ? @"-f dshow -i video=""screen-capture-recorder""" : "-f gdigrab")} " +
+                    Arguments = $"{(Options.UseDShowCapture ? @"-f dshow -i video=""screen-capture-recorder""" : $"-f gdigrab -framerate {Options.Framerate} -i desktop")} " +
                             $"-r {Options.Framerate} -c:v {Options.VideoCodec} -b:v {Options.MemoryBitrateMegabytes}M " +
                             $"-g {SegmentInterval * Options.Framerate} -flags -global_header -map 0 -crf 0 " +
                             $"-preset ultrafast -f segment -segment_time {SegmentInterval} -segment_format ismv " +
@@ -67,7 +69,13 @@ namespace SharpReplay.Recorders
                     CreateNoWindow = true
                 }
             };
-            FFmpeg.Exited += delegate { IsRecording = false; };
+            FFmpeg.Exited += delegate
+            {
+                IsRecording = false;
+
+                Stopped?.Invoke(StopRequested);
+            };
+
             FFmpeg.Start();
 
             if (Options.LogFFmpegOutput)
@@ -158,15 +166,23 @@ namespace SharpReplay.Recorders
         public async Task StopAsync(bool discard = false)
         {
             LogTo.Info("Stopping");
+            StopRequested = true;
 
-            FFmpeg.StandardInput.Write("qqqqqqqqqqqq");
+            try
+            {
+                FFmpeg.StandardInput.Write("qqqqqqqqqqqq");
 
-            if (!await FFmpeg.WaitForExitAsync(3000))
-                FFmpeg.Kill();
+                if (!await FFmpeg.WaitForExitAsync(3000))
+                    FFmpeg.Kill();
 
-            await Task.Delay(300);
+                await Task.Delay(300);
 
-            FFmpeg.Dispose();
+                FFmpeg.Dispose();
+            }
+            finally
+            {
+                StopRequested = false;
+            }
 
             foreach (var pipe in Pipes)
             {

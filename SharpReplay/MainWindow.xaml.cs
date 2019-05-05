@@ -1,4 +1,5 @@
-﻿using MahApps.Metro.Controls;
+﻿using Anotar.Log4Net;
+using MahApps.Metro.Controls;
 using NHotkey.Wpf;
 using SharpReplay.Models;
 using SharpReplay.Recorders;
@@ -75,7 +76,20 @@ namespace SharpReplay
             SaveOptions();
 
             Recorder = new FFmpegRecorder(Options);
+            Recorder.Stopped += this.Recorder_Stopped;
+
             await Recorder.StartAsync();
+        }
+
+        private async void Recorder_Stopped(bool requested)
+        {
+            if (!requested)
+            {
+                LogTo.Error("Recorder unexpectedly stopped, restarting in 1 second");
+
+                await Task.Delay(1000);
+                await Recorder.StartAsync();
+            }
         }
 
         private async void Restart_Click(object sender, RoutedEventArgs e)
