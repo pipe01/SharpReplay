@@ -41,7 +41,7 @@ namespace SharpReplay.Models
         [Description("Requires https://github.com/rdp/screen-capture-recorder-to-video-windows-free")]
         public bool UseDShowCapture { get; set; }
 
-        [Description("If true the output will be smaller but will use more CPU")]
+        [Description("If true the output will be smaller but will use more CPU and will be slower")]
         public bool EncodeOutput { get; set; } = false;
 
         [Description("100 means lossless image, 0 means there's barely any video")]
