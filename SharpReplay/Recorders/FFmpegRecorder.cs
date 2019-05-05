@@ -142,7 +142,10 @@ namespace SharpReplay.Recorders
                 {
                     while (pipe.IsConnected && (read = pipe.Read(buffer, 0, buffer.Length)) > 0)
                     {
-                        mem.Write(buffer, 0, read);
+                        lock (mem)
+                        {
+                            mem.Write(buffer, 0, read);
+                        }
                     }
                 }
                 catch (ObjectDisposedException) { }
@@ -224,7 +227,12 @@ namespace SharpReplay.Recorders
                 {
                     item.Stream.Position = 0;
 
-                    await item.Stream.CopyToAsync(file);
+                    await Task.Run(() =>
+                    {
+                        lock (item.Stream)
+                            item.Stream.CopyTo(file);
+                    });
+
                     file.Flush();
                 }
             }

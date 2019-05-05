@@ -88,11 +88,15 @@ namespace SharpReplay
 
         private void SetStatus(string text, Color color)
         {
-            Dispatcher.Invoke(() =>
+            try
             {
-                this.Status = text;
-                this.StatusColor = new SolidColorBrush(color);
-            });
+                Dispatcher.Invoke(() =>
+                {
+                    this.Status = text;
+                    this.StatusColor = new SolidColorBrush(color);
+                });
+            }
+            catch { }
         }
 
         private void Recorder_Started()

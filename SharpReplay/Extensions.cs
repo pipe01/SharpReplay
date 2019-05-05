@@ -52,8 +52,12 @@ namespace SharpReplay
             process.EnableRaisingEvents = true;
             process.Exited += (sender, args) =>
             {
-                if (!cancellationToken.IsCancellationRequested)
-                    tcs.TrySetResult(null);
+                try
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                        tcs.TrySetResult(null);
+                }
+                catch { }
             };
 
             if (cancellationToken != default)
