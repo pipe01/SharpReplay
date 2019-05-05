@@ -50,7 +50,12 @@ namespace SharpReplay
 
             var tcs = new TaskCompletionSource<object>();
             process.EnableRaisingEvents = true;
-            process.Exited += (sender, args) => tcs.TrySetResult(null);
+            process.Exited += (sender, args) =>
+            {
+                if (!cancellationToken.IsCancellationRequested)
+                    tcs.TrySetResult(null);
+            };
+
             if (cancellationToken != default)
                 cancellationToken.Register(tcs.SetCanceled);
 
